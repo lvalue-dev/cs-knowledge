@@ -71,14 +71,17 @@ svg.ic { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor
 .lvbar { height: 4px; border-radius: 2px; background: var(--panel3); overflow: hidden; }
 .lvbar i { display: block; height: 100%; width: 0; border-radius: 2px; background: var(--grad); transition: width .6s var(--ease); }
 
-#symlink { position: relative; display: flex; gap: 10px; align-items: center; padding: 11px 12px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--brand) 40%, var(--line)); background: linear-gradient(135deg, color-mix(in srgb, var(--brand) 12%, transparent), color-mix(in srgb, var(--brand2) 8%, transparent)); transition: transform .25s var(--ease), border-color .2s, box-shadow .25s; }
-#symlink:hover { transform: translateY(-1px); border-color: var(--brand); box-shadow: 0 10px 26px -14px var(--brand); }
-#symlink svg { color: var(--brand); width: 18px; height: 18px; }
-#symlink span { display: flex; flex-direction: column; min-width: 0; }
-#symlink b { font-size: 13.5px; font-weight: 700; } #symlink small { font-size: 11.5px; color: var(--muted); }
-#symlink.cur { border-color: var(--brand); box-shadow: inset 0 0 0 1px var(--brand); }
+#symlink, #preplink { position: relative; display: flex; gap: 10px; align-items: center; padding: 11px 12px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--brand) 40%, var(--line)); background: linear-gradient(135deg, color-mix(in srgb, var(--brand) 12%, transparent), color-mix(in srgb, var(--brand2) 8%, transparent)); transition: transform .25s var(--ease), border-color .2s, box-shadow .25s; }
+.hub:hover { transform: translateY(-1px); border-color: var(--brand); box-shadow: 0 10px 26px -14px var(--brand); }
+.hub svg { color: var(--brand); width: 18px; height: 18px; }
+.hub span { display: flex; flex-direction: column; min-width: 0; }
+.hub b { font-size: 13.5px; font-weight: 700; } .hub small { font-size: 11.5px; color: var(--muted); }
+.hub.cur { border-color: var(--brand); box-shadow: inset 0 0 0 1px var(--brand); }
 
-.group { margin-top: 20px; }
+#preplink { margin-top: 8px; --brand: var(--new); --brand2: var(--cmp); }
+#navmode { margin: 16px 0 0; }
+#navmode button { flex: 1; }
+.group { margin-top: 18px; }
 .group h2 { display: flex; gap: 8px; align-items: center; padding: 0 6px; font-size: 12px; font-weight: 400; }
 .group h2 small { flex: 1; min-width: 0; color: var(--faint); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .group h2 .cnt { font: 11px var(--mono); color: var(--muted); }
@@ -86,6 +89,10 @@ svg.ic { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor
 #nav a { position: relative; display: flex; gap: 9px; align-items: flex-start; padding: 7px 8px 7px 10px; border-radius: 10px; font-size: 13.5px; line-height: 1.45; color: var(--muted); transition: background .2s, color .2s; }
 #nav a:hover { background: var(--panel2); color: var(--text); }
 #nav a.cur { background: var(--panel2); color: var(--text); font-weight: 650; box-shadow: inset 0 0 0 1px var(--line); }
+#nav a > span { flex: 1; min-width: 0; }
+#nav a .lv { flex: none; width: 6px; height: 6px; margin-top: 7px; border-radius: 50%; background: var(--c); }
+.lv.basic { --c: var(--done); } .lv.mid { --c: var(--cmp); } .lv.adv { --c: var(--active); } .lv.senior { --c: var(--bad); }
+.badge.topic { --c: var(--brand); }
 #nav a.cur::before { content: ""; position: absolute; left: -1px; top: 8px; bottom: 8px; width: 3px; border-radius: 2px; background: var(--grad); }
 .chk { flex: none; width: 16px; height: 16px; margin-top: 2px; }
 .chk circle { fill: none; stroke: var(--line2); stroke-width: 1.5; transition: stroke .3s, fill .3s; }
@@ -111,7 +118,7 @@ a.done .chk path { stroke-dashoffset: 0; }
 #main { padding: 0 var(--gut) 110px; max-width: 1640px; width: 100%; margin: 0 auto; }
 /* 고정 헤더: 스크롤해도 제목과 조작 버튼이 화면 위에 남는다. 실제 높이는 JS가 --head-h에 기록한다 */
 #bar { position: sticky; top: 0; z-index: 6; display: flex; gap: 12px; align-items: center; min-height: 56px; padding: 9px 0; }
-#bar::before { content: ""; position: absolute; inset: 0 -100vw; z-index: -1; background: color-mix(in srgb, var(--bg) 78%, transparent); backdrop-filter: blur(16px) saturate(1.4); border-bottom: 1px solid var(--line); }
+#bar::before { content: ""; position: absolute; inset: 0 -100vw; z-index: -1; background: color-mix(in srgb, var(--bg) 90%, transparent); backdrop-filter: blur(16px) saturate(1.4); border-bottom: 1px solid var(--line); }
 .headline { flex: 1; min-width: 0; display: flex; gap: 10px; align-items: center; }
 h1 { min-width: 0; font-size: clamp(16px, 1vw + 8px, 21px); line-height: 1.3; font-weight: 750; letter-spacing: -.025em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 요약 + 점수판 + 카드가 헤더와 플레이어 사이 공간에 정확히 들어간다. 정리·증상은 그 아래 */
@@ -250,7 +257,7 @@ select:hover { border-color: var(--line2); }
 
 .stack { display: flex; flex-direction: column-reverse; gap: 5px; min-height: 42px; }
 .stack.down { flex-direction: column; }
-.stack .cell { justify-content: flex-start; padding: 0 12px; }
+.stack .cell { justify-content: flex-start; height: auto; min-height: 38px; padding: 8px 12px; text-align: left; line-height: 1.45; font-family: var(--mono), var(--sans); }
 
 .buckets { display: grid; grid-auto-flow: column; grid-template-rows: repeat(4, auto); grid-auto-columns: minmax(0, 1fr); gap: 4px 12px; }
 .brow { display: flex; gap: 8px; align-items: center; padding: 3px 5px; border-radius: 10px; min-height: 38px; transition: background .3s, box-shadow .3s; }
@@ -283,6 +290,8 @@ select:hover { border-color: var(--line2); }
 .node[data-s="done"] rect { animation: nring-c .6s var(--ease); }
 .node[data-s="bad"] rect { animation: nring-d .6s var(--ease); }
 .node[data-s="new"] rect { animation: nring-e .6s var(--ease); }
+.node.bare rect { fill: var(--panel); stroke: none; }
+.node.bare text { fill: var(--muted); font-size: 10px; }
 .node[data-s="dim"] { opacity: .28; }
 .node[data-s="gone"] { opacity: .14; }
 .node[data-s="gone"] rect { stroke-dasharray: 3 3; }
@@ -334,7 +343,7 @@ a.chip:hover, button.chip:hover { border-color: var(--brand); color: var(--text)
 button.chip:active { transform: scale(.95); }
 .chip.on { background: var(--grad); border-color: transparent; color: var(--on-brand); font-weight: 700; }
 .tag { padding: 2px 9px; border-radius: 7px; font-size: 11px; font-weight: 700; color: var(--active); background: color-mix(in srgb, var(--active) 13%, transparent); }
-.symbar { position: sticky; top: var(--head-h); z-index: 3; display: grid; gap: 10px; padding: 12px 0; background: linear-gradient(180deg, var(--bg) 78%, transparent); }
+.symbar { position: sticky; top: var(--head-h); z-index: 3; display: grid; gap: 10px; margin: 0 calc(var(--gut) * -1); padding: 12px var(--gut); background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
 #symq { width: 100%; height: 44px; padding: 0 16px; border-radius: 12px; border: 1px solid var(--line2); background: var(--panel); color: var(--text); transition: border-color .2s, box-shadow .2s; }
 #symq:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand) 18%, transparent); }
 #symlist { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr)); gap: 16px; }
@@ -349,6 +358,31 @@ dd code, .sx code, .tri code { background: var(--panel3); padding: 1px 5px; bord
 .go { margin-top: auto; font-size: 13px; font-weight: 700; color: var(--brand); transition: letter-spacing .25s var(--ease); }
 .go:hover { letter-spacing: .01em; text-decoration: underline; text-underline-offset: 3px; }
 .none { color: var(--muted); }
+.fineprint { margin-top: 10px; font-size: 12.5px !important; color: var(--muted); }
+
+/* ---------- 면접 질문 · 코딩 테스트 ---------- */
+.box.iv { --c: var(--new); grid-column: 1 / -1; display: grid; gap: 8px; }
+.box.iv h3 { margin: 0 0 2px; }
+.box.ct { --c: var(--cmp); grid-column: 1 / -1; }
+.qa { border: 1px solid var(--line); border-radius: 12px; background: var(--panel2); transition: border-color .25s, background .25s, box-shadow .3s; }
+.qa[open] { border-color: var(--line2); }
+.qa.known { border-color: color-mix(in srgb, var(--done) 35%, var(--line)); }
+.qa.pick { border-color: var(--new); box-shadow: 0 0 0 4px color-mix(in srgb, var(--new) 18%, transparent); }
+.qa summary { display: flex; gap: 10px; align-items: flex-start; padding: 10px 14px; cursor: pointer; list-style: none; font-size: 14px; font-weight: 600; line-height: 1.5; }
+.qa summary::-webkit-details-marker { display: none; }
+.qa summary::after { content: "답 보기"; flex: none; margin-left: auto; padding: 1px 9px; border-radius: 99px; border: 1px solid var(--line2); font-size: 11px; font-weight: 500; color: var(--muted); white-space: nowrap; }
+.qa[open] summary::after { content: "접기"; }
+.qm { flex: none; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 7px; background: color-mix(in srgb, var(--new) 16%, transparent); color: var(--new); font: 700 11px var(--mono); }
+.qa.known .qm { background: var(--done); color: var(--on-brand); }
+.qa-a { padding: 0 14px 12px 46px; animation: rise .3s var(--ease); }
+.qa-a p { font-size: 14px; line-height: 1.7; }
+.know { margin-top: 10px; padding: 4px 12px; border-radius: 99px; border: 1px solid var(--line2); background: none; font-size: 12px; color: var(--muted); transition: border-color .2s, color .2s, background .2s; }
+.know:hover { border-color: var(--done); color: var(--done); }
+.qa.known .know { border-color: var(--done); color: var(--done); background: color-mix(in srgb, var(--done) 10%, transparent); }
+.qa-tools { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; font-size: 12.5px; color: var(--muted); }
+.qa-tools label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
+#qa-prog { margin-left: auto; font-family: var(--mono); font-size: 12px; }
+.sym-card .qa { background: var(--panel2); }
 
 /* ---------- 플레이어 ---------- */
 #player { position: fixed; left: 284px; right: 0; bottom: 0; z-index: 7; height: var(--player-h); display: flex; gap: 14px; align-items: center; padding: 0 var(--gut); background: color-mix(in srgb, var(--panel) 78%, transparent); backdrop-filter: blur(18px) saturate(1.4); border-top: 1px solid var(--line); }
@@ -437,6 +471,8 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; border: 1px solid 
   .tri-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
   .symbar { position: static; }
   dl { grid-template-columns: minmax(0, 1fr); gap: 2px; } dd { margin-bottom: 6px; }
+  .qa-a { padding-left: 14px; }
+  #qa-prog { margin-left: 0; }
 }
 @media (max-width: 400px) {
   #b-prev, #b-next { font-size: 0; gap: 0; min-width: 42px; }

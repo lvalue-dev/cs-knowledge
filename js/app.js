@@ -24,6 +24,7 @@
     play: ic('<path d="M7 5l12 7-12 7z" fill="currentColor"/>'),
     pause: ic('<path d="M8 5v14M16 5v14"/>'),
     replay: ic('<path d="M4 12a8 8 0 1 0 2.6-5.9M4 4v5h5"/>'),
+    target: ic('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/>'),
   };
   for (const el of document.querySelectorAll('[data-ic]')) el.outerHTML = IC[el.dataset.ic];
   const EASE = 'cubic-bezier(.22,1,.36,1)';
@@ -175,7 +176,7 @@
       svg.style.setProperty('--gmax', `${p.w * (p.scale || 1.25)}px`);
       const at = (n) => (p.pos ? p.pos[n.id] : n);
       const byId = new Map(p.nodes.map((n) => [n.id, n]));
-      const half = (n) => [(n.w || 32) / 2, 14];
+      const half = (n) => [(n.w || 32) / 2, (n.h || 28) / 2];
       sync(svg.children[0], p.edges.filter((e) => byId.has(e.a) && byId.has(e.b)).map((e) => ({ ...e, id: `${e.a}>${e.b}` })),
         () => document.createElementNS(SVG, 'path'),
         (el, e) => {
@@ -205,6 +206,7 @@
         const { x, y } = at(n), [hw, hh] = half(n);
         g.style.transform = `translate(${x}px,${y}px)`;
         g.dataset.s = n.s || '';
+        g.classList.toggle('bare', !!n.bare);
         const [r, t, sub] = g.children;
         r.setAttribute('x', -hw); r.setAttribute('y', -hh); r.setAttribute('width', hw * 2); r.setAttribute('height', hh * 2);
         r.setAttribute('rx', n.round ? hh : 6);
@@ -239,11 +241,15 @@
   /* ---------- 레슨 로드 ---------- */
   const CHK = '<svg class="chk" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M5 8.3l2.1 2.1L11 6.2"/></svg>';
   function buildNav() {
-    $('#nav').innerHTML = LEVELS.map(([key, name, desc]) => {
-      const items = CS.lessons.filter((l) => l.level === key);
-      return `<div class="group" data-lv="${key}"><h2><span class="badge ${key}">${name}</span><small>${desc}</small><span class="cnt"></span></h2><div class="lvbar"><i></i></div>${items.map((l) =>
-        `<a href="#${l.id}" data-id="${l.id}">${CHK}${esc(l.title)}</a>`).join('')}</div>`;
-    }).join('');
+    const byTopic = store.get('cs-nav') === 'topic';
+    for (const b of $('#navmode').children) b.classList.toggle('on', (b.dataset.m === 'topic') === byTopic);
+    const lvName = (l) => LEVELS.find((x) => x[0] === l.level)[1];
+    const groups = byTopic
+      ? CS.topics.map(([key, name, desc]) => [key, `<span class="badge topic">${name}</span>`, desc, CS.lessons.filter((l) => CS.topicOf[l.id] === key)])
+      : LEVELS.map(([key, name, desc]) => [key, `<span class="badge ${key}">${name}</span>`, desc, CS.lessons.filter((l) => l.level === key)]);
+    $('#nav').innerHTML = groups.filter((g) => g[3].length).map(([key, badge, desc, items]) =>
+      `<div class="group"><h2>${badge}<small>${desc}</small><span class="cnt"></span></h2><div class="lvbar"><i></i></div>${items.map((l) =>
+        `<a href="#${l.id}" data-id="${l.id}">${CHK}<span>${esc(l.title)}</span>${byTopic ? `<i class="lv ${l.level}" title="${lvName(l)}"></i>` : ''}</a>`).join('')}</div>`).join('');
     markNav();
   }
   function markNav() {
@@ -252,14 +258,15 @@
       a.classList.toggle('done', done.has(a.dataset.id));
     }
     for (const g of document.querySelectorAll('#nav .group')) {
-      const all = CS.lessons.filter((l) => l.level === g.dataset.lv), n = all.filter((l) => done.has(l.id)).length;
-      $('.cnt', g).textContent = `${n}/${all.length}`;
-      $('.lvbar i', g).style.width = `${(n / all.length) * 100}%`;
+      const all = g.querySelectorAll('a').length, n = g.querySelectorAll('a.done').length;
+      $('.cnt', g).textContent = `${n}/${all}`;
+      $('.lvbar i', g).style.width = `${(n / all) * 100}%`;
     }
     const total = CS.lessons.length, n = CS.lessons.filter((l) => done.has(l.id)).length;
     $('#prog b').textContent = `${n} / ${total}`;
     $('#prog .lvbar i').style.width = `${(n / total) * 100}%`;
-    $('#symlink').classList.toggle('cur', !state.lesson);
+    $('#symlink').classList.toggle('cur', state.page === 'symptoms');
+    $('#preplink').classList.toggle('cur', state.page === 'prep');
     const cur = $('#nav a.cur');
     if (cur) cur.scrollIntoView({ block: 'nearest' });
   }
@@ -268,21 +275,101 @@
   const lessonLink = (id) => { const l = CS.lessons.find((x) => x.id === id); return l ? `<a class="chip" href="#${id}">${esc(l.title)}</a>` : ''; };
 
   // 증상 사전: 디버깅 중 관찰한 현상 → 의심할 CS 개념 → 확인 방법 → 처방
-  function loadSymptoms() {
+  // 레슨이 아닌 페이지(증상 사전, 면접·코테 대비)의 공통 틀
+  function openPage(page, badge, title, count, summary) {
     pause();
     state.lesson = null;
+    state.page = page;
     document.body.classList.add('sym');
     document.body.classList.remove('nav-open');
-    $('#level').textContent = '진단';
+    $('#level').textContent = badge;
     $('#level').className = 'badge';
-    $('#pos').textContent = `${Object.keys(CS.diagnose).length}개 항목`;
-    $('#title').textContent = '증상으로 찾기';
+    $('#pos').textContent = count;
+    $('#title').textContent = $('#title').title = title;
     $('#summary').className = '';
-    $('#summary').textContent = '디버깅하다 본 현상에서 출발합니다. 어떤 CS 개념의 문제인지, 무엇을 재 보면 확신할 수 있는지, 어느 방향으로 고쳐야 하는지를 정리했습니다.';
-    document.title = '증상으로 찾기 — CS 보이는 코드';
+    $('#summary').textContent = summary;
+    document.title = `${title} — CS 보이는 코드`;
     $('#param').hidden = true;
     const view = $('#symview');
     view.hidden = false;
+    return view;
+  }
+  const topicName = (id) => (CS.topics.find((t) => t[0] === CS.topicOf[id]) || [])[1] || '';
+  const levelBadge = (l) => `<span class="badge ${l.level}">${LEVELS.find((x) => x[0] === l.level)[1]}</span>`;
+
+  /* ---------- 면접 질문: 떠올려 보고 → 답을 펼치고 → 스스로 채점 ---------- */
+  let known = new Set(store.get('cs-known', []));
+  const qaHTML = (id) => (CS.qa[id] || []).map(([q, a], i) => `
+    <details class="qa${known.has(`${id}:${i}`) ? ' known' : ''}" data-k="${id}:${i}">
+      <summary><span class="qm">Q</span><span>${q}</span></summary>
+      <div class="qa-a"><p>${a}</p><button type="button" class="know">${known.has(`${id}:${i}`) ? '✓ 답할 수 있음' : '막힘 없이 답할 수 있었다'}</button></div>
+    </details>`).join('');
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('.know');
+    if (!b) return;
+    const d = b.closest('.qa'), k = d.dataset.k;
+    if (known.has(k)) known.delete(k); else known.add(k);
+    store.set('cs-known', [...known]);
+    for (const el of document.querySelectorAll(`.qa[data-k="${k}"]`)) {
+      el.classList.toggle('known', known.has(k));
+      $('.know', el).textContent = known.has(k) ? '✓ 답할 수 있음' : '막힘 없이 답할 수 있었다';
+    }
+    const pc = $('#qa-prog');
+    if (pc) pc.textContent = `${known.size} / ${Object.values(CS.qa).reduce((n, x) => n + x.length, 0)} 답할 수 있음`;
+  });
+
+  function loadPrep() {
+    const total = Object.values(CS.qa).reduce((n, x) => n + x.length, 0);
+    const view = openPage('prep', '대비', '면접 · 코테 대비', `질문 ${total}개`,
+      '코딩 테스트는 "문제에서 유형을 알아보는 눈"이, 면접은 "왜 그런지 자기 말로 설명하는 힘"이 필요합니다. 표로 유형을 고르고, 질문은 답을 가린 채 먼저 말해 본 뒤 펼쳐 보세요.');
+    view.innerHTML = `
+      <div class="box"><h3>코딩 테스트 ① 입력 크기로 허용 복잡도 가늠하기</h3>
+        <table><tr><th>입력 크기 n</th><th>통과 가능한 복잡도</th><th>떠올릴 방법</th></tr>${CS.sizes.map((r) => `<tr><td><code>${r[0]}</code></td><td><code>${r[1]}</code></td><td>${r[2]}</td></tr>`).join('')}</table>
+        <p class="fineprint">1초에 단순 연산 약 1억 번을 기준으로 한 어림값입니다. 제한 시간과 언어에 따라 달라집니다.</p></div>
+      <div class="box"><h3>코딩 테스트 ② 문제 문장의 신호로 유형 고르기</h3>
+        <div class="tri">${CS.lessons.filter((l) => CS.ct[l.id]).map((l) => { const c = CS.ct[l.id]; return `<div class="tri-row"><div><b>${c.signal}</b></div><div>${c.how} <code>${c.big}</code></div><div class="chips">${lessonLink(l.id)}</div></div>`; }).join('')}</div></div>
+      <div class="symbar"><input id="symq" type="search" placeholder="질문 검색 (예: 인덱스, TCP, 캐시, 토큰)" aria-label="질문 검색">
+        <div class="chips" id="symcats"><button type="button" class="chip on" data-c="">전체</button>${CS.topics.map(([k, n]) => `<button type="button" class="chip" data-c="${k}">${n}</button>`).join('')}</div>
+        <div class="qa-tools"><button type="button" id="qa-rand" class="ghost">${IC.replay}아직 못 푼 질문 하나 뽑기</button><label><input type="checkbox" id="qa-todo"> 못 푼 질문만</label><span id="qa-prog">${known.size} / ${total} 답할 수 있음</span></div></div>
+      <div id="symlist"></div>`;
+    let cat = '';
+    const draw = () => {
+      const q = $('#symq').value.trim().toLowerCase(), todo = $('#qa-todo').checked;
+      const rows = CS.lessons.filter((l) => CS.qa[l.id] && (!cat || CS.topicOf[l.id] === cat)).map((l) => {
+        const items = CS.qa[l.id].map((x, i) => [x, i]).filter(([x, i]) => (!q || (l.title + x[0] + x[1]).toLowerCase().includes(q)) && (!todo || !known.has(`${l.id}:${i}`)));
+        if (!items.length) return '';
+        const all = qaHTML(l.id).split('</details>').filter((h) => h.trim()).map((h) => h + '</details>');
+        return `<article class="sym-card"><header><div class="chips"><span class="tag">${topicName(l.id)}</span></div>${levelBadge(l)}</header>
+          ${items.map(([, i]) => all[i]).join('')}
+          <a class="go" href="#${l.id}">애니메이션으로 복습: ${esc(l.title)} →</a></article>`;
+      }).join('');
+      $('#symlist').innerHTML = rows || '<p class="none">일치하는 질문이 없습니다.</p>';
+    };
+    $('#symq').oninput = draw;
+    $('#qa-todo').onchange = draw;
+    $('#symcats').onclick = (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      cat = b.dataset.c;
+      for (const x of $('#symcats').children) x.classList.toggle('on', x === b);
+      draw();
+    };
+    $('#qa-rand').onclick = () => {
+      const pool = [...document.querySelectorAll('#symlist .qa:not(.known)')];
+      const pick = pool[Math.floor(Math.random() * pool.length)];
+      if (!pick) return;
+      for (const d of document.querySelectorAll('#symlist .qa.pick')) d.classList.remove('pick');
+      pick.classList.add('pick');
+      pick.scrollIntoView({ block: 'center', behavior: reduced ? 'auto' : 'smooth' });
+    };
+    draw();
+    markNav();
+    scrollTo(0, 0);
+  }
+
+  function loadSymptoms() {
+    const view = openPage('symptoms', '진단', '증상으로 찾기', `${Object.keys(CS.diagnose).length}개 항목`,
+      '디버깅하다 본 현상에서 출발합니다. 어떤 CS 개념의 문제인지, 무엇을 재 보면 확신할 수 있는지, 어느 방향으로 고쳐야 하는지를 정리했습니다.');
     view.innerHTML = `
       <div class="box steps"><h3>원인을 좁히는 순서</h3><ol>${CS.method.map((m) => `<li><span><b>${m[0]}</b> ${m[1]}</span></li>`).join('')}</ol></div>
       <div class="box"><h3>1차 분류: 관찰한 것으로 영역 좁히기</h3>
@@ -318,6 +405,8 @@
 
   function load(id) {
     if (id === 'symptoms') return loadSymptoms();
+    if (id === 'prep') return loadPrep();
+    state.page = null;
     const lesson = CS.lessons.find((l) => l.id === id) || CS.lessons[0];
     pause();
     document.body.classList.remove('sym');
@@ -340,10 +429,12 @@
       pm.lastChild.innerHTML = lesson.param.options.map((o) => `<option${o === state.n ? ' selected' : ''}>${o}</option>`).join('');
     }
 
-    const dg = CS.diagnose[lesson.id];
+    const dg = CS.diagnose[lesson.id], ct = CS.ct[lesson.id], qa = CS.qa[lesson.id];
     $('#learn').innerHTML = `
       ${dg ? `<div class="box dx"><h3>이런 현상을 봤다면 이 개념입니다</h3><ul class="sx">${dg.symptoms.map((x) => `<li>${x}</li>`).join('')}</ul>
         <dl><dt>확인 방법</dt><dd>${dg.check}</dd><dt>고치는 방향</dt><dd>${dg.fix}</dd></dl><a class="go" href="#symptoms">다른 증상 찾아보기 →</a></div>` : ''}
+      ${ct ? `<div class="box ct"><h3>코딩 테스트에서</h3><dl><dt>이런 문제면</dt><dd><b>${ct.signal}</b></dd><dt>접근</dt><dd>${ct.how} <code>${ct.big}</code></dd><dt>자주 틀리는 곳</dt><dd>${ct.trap}</dd></dl></div>` : ''}
+      ${qa ? `<div class="box iv"><h3>면접 질문 — 답을 가린 채 먼저 말해 보세요</h3>${qaHTML(lesson.id)}<a class="go" href="#prep">질문 은행 전체 보기 →</a></div>` : ''}
       <div class="box"><h3>핵심 정리</h3><ul>${lesson.points.map((p) => `<li>${p}</li>`).join('')}</ul></div>
       <div class="box senior"><h3>시니어의 시선</h3><p>${lesson.senior}</p></div>
       ${lesson.variants.some((v) => v.big) ? `<div class="box"><h3>복잡도 비교</h3><table><tr><th>방식</th><th>시간</th><th>공간</th></tr>${lesson.variants.map((v) =>
@@ -691,6 +782,12 @@
     else if (e.key === 'Home') { e.preventDefault(); pause(); go(0); }
     else if (e.key === 'End') { e.preventDefault(); pause(); go(state.total - 1); }
   });
+  $('#navmode').onclick = (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    store.set('cs-nav', b.dataset.m);
+    buildNav();
+  };
   addEventListener('hashchange', () => load(location.hash.slice(1)));
 
   if (store.get('cs-nav-off')) document.body.classList.add('nav-off');
