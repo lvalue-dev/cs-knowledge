@@ -27,23 +27,21 @@
   </aside>
   <div id="scrim"></div>
   <main id="main">
-    <div id="stage">
-      <header class="top">
-        <div class="top-row">
-          <button id="menu" type="button" aria-label="목차 열기/접기" title="목차 열기/접기"><i data-ic="menu"></i></button>
-          <div class="headline"><h1 id="title"></h1><span id="level" class="badge"></span><span id="pos"></span></div>
-          <div class="top-ctl">
-            <button id="tip" type="button" hidden>그림이 작다면 목차 접기</button>
-            <div id="viewmode" class="seg" role="group" aria-label="보기 방식" hidden>
-              <button type="button" data-m="side" title="두 방식을 한 화면에 나란히">나란히</button>
-              <button type="button" data-m="focus" title="한 방식씩 크게">하나씩</button>
-            </div>
-            <label id="param" hidden><span></span><select></select></label>
-            <a id="tolearn" href="#learn">정리 · 증상<i data-ic="down"></i></a>
-          </div>
+    <header id="bar">
+      <button id="menu" type="button" aria-label="목차 열기/접기" title="목차 열기/접기"><i data-ic="menu"></i></button>
+      <div class="headline"><h1 id="title"></h1><span id="level" class="badge"></span><span id="pos"></span></div>
+      <div class="top-ctl">
+        <button id="tip" type="button" hidden>그림이 작다면 목차 접기</button>
+        <div id="viewmode" class="seg" role="group" aria-label="보기 방식" hidden>
+          <button type="button" data-m="side" title="두 방식을 한 화면에 나란히">나란히</button>
+          <button type="button" data-m="focus" title="한 방식씩 크게">하나씩</button>
         </div>
-        <p id="summary"></p>
-      </header>
+        <label id="param" hidden><span></span><select></select></label>
+        <a id="tolearn" href="#learn" title="정리 · 증상으로 이동"><span>정리 · 증상</span><i data-ic="down"></i></a>
+      </div>
+    </header>
+    <div id="stage">
+      <p id="summary"></p>
       <section id="symview" hidden></section>
       <section id="score" aria-label="지표 비교"></section>
       <nav id="tabs" hidden></nav>

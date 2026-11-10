@@ -330,7 +330,7 @@
     $('#level').textContent = lv[1];
     $('#level').className = 'badge ' + lesson.level;
     $('#pos').textContent = `${i + 1} / ${CS.lessons.length}`;
-    $('#title').textContent = lesson.title;
+    $('#title').textContent = $('#title').title = lesson.title;
     document.title = `${lesson.title} — CS 보이는 코드`;
 
     const pm = $('#param');
@@ -361,10 +361,13 @@
 
   const textLen = (html) => html.replace(/<[^>]+>/g, '').length;
   const shown = () => (state.side ? state.runs : [state.runs[state.tab]]);
+  // 화면 단계: 좁음(카드가 자연 높이로 쌓임) / 서랍(목차가 화면 밖 서랍). CSS의 미디어 쿼리와 같은 값
+  const mqNarrow = matchMedia('(max-width: 760px)'), mqDrawer = matchMedia('(max-width: 1024px)');
+  const roomy = () => !mqNarrow.matches && $('#main').clientWidth >= 780; // 두 카드를 나란히 놓을 최소 너비
   const wantSide = () => {
-    if (state.runs.length < 2 || innerWidth < 860) return false;
+    if (state.runs.length < 2 || !roomy()) return false;
     const pref = store.get('cs-view');
-    return pref ? pref === 'side' : innerWidth >= 1180 && innerHeight >= 760; // 작은 화면은 '하나씩'이 기본
+    return pref ? pref === 'side' : $('#main').clientWidth >= 890 && innerHeight >= 760; // 작은 화면은 '하나씩'이 기본
   };
 
   // 현재 입력 크기로 모든 방식을 실행해 단계를 만들고 카드·점수판 DOM을 새로 짠다
@@ -421,7 +424,7 @@
   function layout(reset) {
     state.side = wantSide();
     const multi = state.runs.length > 1;
-    $('#viewmode').hidden = !multi || innerWidth < 860;
+    $('#viewmode').hidden = !multi || !roomy();
     for (const b of $('#viewmode').children) b.classList.toggle('on', (b.dataset.m === 'side') === state.side);
     $('#tabs').hidden = !multi || state.side;
     [...$('#tabs').children].forEach((b, i) => b.classList.toggle('on', i === state.tab));
@@ -474,7 +477,7 @@
     }
     state.measuring = false;
     // 그림이 많이 줄었고 목차가 펼쳐져 있으면, 목차를 접어 넓게 볼 수 있다고 알려 준다
-    $('#tip').hidden = !(minZoom < 0.75 && state.side && !document.body.classList.contains('nav-off'));
+    $('#tip').hidden = !(minZoom < 0.75 && state.side && !mqDrawer.matches && !document.body.classList.contains('nav-off'));
     render();
   }
 
@@ -646,20 +649,30 @@
     layout(true);
   };
   $('#tolearn').onclick = (e) => { e.preventDefault(); $('#learn').scrollIntoView({ behavior: reduced ? 'auto' : 'smooth' }); };
+  // 창 크기·헤더 높이·목차 접힘이 바뀌면 보기 방식과 그림 크기를 다시 맞춘다
   let rz;
-  addEventListener('resize', () => {
+  const relayout = () => {
     clearTimeout(rz);
     rz = setTimeout(() => {
       if (!state.lesson) return;
-      if (wantSide() !== state.side) { pause(); layout(false); } else fitViz();
+      if (wantSide() !== state.side) { pause(); layout(false); } else { $('#viewmode').hidden = state.runs.length < 2 || !roomy(); fitViz(); }
     }, 150);
-  });
+  };
+  addEventListener('resize', relayout);
+  // 고정 헤더의 실제 높이를 CSS 변수로 알려 준다 (무대 높이와 고정 요소 위치 계산에 쓰인다)
+  new ResizeObserver(() => {
+    const h = `${$('#bar').offsetHeight}px`;
+    if (document.documentElement.style.getPropertyValue('--head-h') === h) return;
+    document.documentElement.style.setProperty('--head-h', h);
+    relayout();
+  }).observe($('#bar'));
+  mqDrawer.addEventListener('change', () => document.body.classList.remove('nav-open'));
   $('#param select').onchange = (e) => { pause(); state.n = +e.target.value; build(); };
   $('#tip').onclick = () => $('#menu').click();
   $('#menu').onclick = () => {
-    if (innerWidth <= 860) return document.body.classList.toggle('nav-open');
+    if (mqDrawer.matches) return document.body.classList.toggle('nav-open');
     store.set('cs-nav-off', document.body.classList.toggle('nav-off')); // 넓은 화면: 목차를 접어 무대를 넓힌다
-    if (state.lesson) fitViz();
+    relayout();
   };
   $('#scrim').onclick = () => document.body.classList.remove('nav-open');
   $('#theme').onclick = () => {
@@ -669,6 +682,7 @@
     store.set('cs-theme', next);
   };
   addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') document.body.classList.remove('nav-open');
     if (!state.lesson) return;
     if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName) && e.target.type !== 'range') return;
     if (e.key === ' ') { e.preventDefault(); toggle(); }

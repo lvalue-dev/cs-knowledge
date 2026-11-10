@@ -8,7 +8,7 @@
   --shadow: inset 0 1px 0 rgba(255, 255, 255, .04), 0 20px 44px -22px rgba(0, 0, 0, .75);
   --grad: linear-gradient(135deg, var(--brand), var(--brand2));
   --ease: cubic-bezier(.22, 1, .36, 1); --spring: cubic-bezier(.34, 1.56, .64, 1);
-  --player-h: 58px;
+  --player-h: 58px; --head-h: 56px; --gut: 28px;
   --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
   color-scheme: dark;
@@ -53,12 +53,12 @@ svg.ic { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor
 * { scrollbar-width: thin; scrollbar-color: var(--line2) transparent; }
 :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
-#app { display: grid; grid-template-columns: 284px minmax(0, 1fr); min-height: 100vh; }
+#app { display: grid; grid-template-columns: 284px minmax(0, 1fr); min-height: 100vh; overflow-x: clip; }
 
 /* ---------- 사이드바 ---------- */
 #scrim { display: none; }
 #main { grid-column: 2; }
-#side { position: sticky; top: 0; height: 100vh; overflow-y: auto; padding: 20px 14px 80px; background: color-mix(in srgb, var(--panel) 82%, transparent); border-right: 1px solid var(--line); backdrop-filter: blur(14px); }
+#side { position: sticky; top: 0; z-index: 8; height: 100vh; overflow-y: auto; padding: 20px 14px 80px; background: color-mix(in srgb, var(--panel) 82%, transparent); border-right: 1px solid var(--line); backdrop-filter: blur(14px); }
 .brand { display: flex; gap: 12px; align-items: center; padding: 2px 6px; }
 .logo { flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; background: var(--grad); color: var(--on-brand); box-shadow: 0 8px 22px -8px color-mix(in srgb, var(--brand) 70%, transparent); }
 .logo svg { width: 20px; height: 20px; fill: currentColor; }
@@ -100,7 +100,7 @@ a.done .chk path { stroke-dashoffset: 0; }
 .badge.basic { --c: var(--done); } .badge.mid { --c: var(--cmp); }
 .badge.adv { --c: var(--active); } .badge.senior { --c: var(--bad); }
 
-@media (min-width: 861px) {
+@media (min-width: 1025px) {
   .nav-off #app { grid-template-columns: minmax(0, 1fr); }
   .nav-off #side { display: none; }
   .nav-off #main { grid-column: 1; max-width: none; }
@@ -108,19 +108,21 @@ a.done .chk path { stroke-dashoffset: 0; }
 }
 
 /* ---------- 본문: 한 화면 무대 ---------- */
-#main { padding: 0 28px 110px; max-width: 1600px; width: 100%; }
-/* 머리말 + 점수판 + 카드가 플레이어 위 공간에 정확히 들어간다. 정리·증상은 그 아래 */
-#stage { display: flex; flex-direction: column; gap: 10px; height: calc(100vh - var(--player-h)); height: calc(100dvh - var(--player-h)); min-height: 600px; padding: 14px 0 12px; }
-.top { flex: none; }
-.top-row { display: flex; gap: 12px; align-items: center; }
-.headline { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: center; }
-h1 { font-size: 21px; line-height: 1.3; font-weight: 750; letter-spacing: -.025em; }
-#pos { color: var(--faint); font: 12px var(--mono); }
-#summary { margin-top: 8px; color: var(--muted); font-size: 13.5px; line-height: 1.55; min-height: 3.1em; padding: 0 12px; border-left: 2px solid var(--line2); transition: color .3s, border-color .3s; }
+#main { padding: 0 var(--gut) 110px; max-width: 1640px; width: 100%; margin: 0 auto; }
+/* 고정 헤더: 스크롤해도 제목과 조작 버튼이 화면 위에 남는다. 실제 높이는 JS가 --head-h에 기록한다 */
+#bar { position: sticky; top: 0; z-index: 6; display: flex; gap: 12px; align-items: center; min-height: 56px; padding: 9px 0; }
+#bar::before { content: ""; position: absolute; inset: 0 -100vw; z-index: -1; background: color-mix(in srgb, var(--bg) 78%, transparent); backdrop-filter: blur(16px) saturate(1.4); border-bottom: 1px solid var(--line); }
+.headline { flex: 1; min-width: 0; display: flex; gap: 10px; align-items: center; }
+h1 { min-width: 0; font-size: clamp(16px, 1vw + 8px, 21px); line-height: 1.3; font-weight: 750; letter-spacing: -.025em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 요약 + 점수판 + 카드가 헤더와 플레이어 사이 공간에 정확히 들어간다. 정리·증상은 그 아래 */
+#stage { display: flex; flex-direction: column; gap: 10px; height: calc(100vh - var(--player-h) - var(--head-h)); height: calc(100dvh - var(--player-h) - var(--head-h)); min-height: 540px; padding: 12px 0; }
+#pos { flex: none; color: var(--faint); font: 12px var(--mono); white-space: nowrap; }
+.headline .badge { flex: none; }
+#summary { flex: none; color: var(--muted); font-size: 13.5px; line-height: 1.55; min-height: 3.1em; padding: 0 12px; border-left: 2px solid var(--line2); transition: color .3s, border-color .3s; }
 #summary.verdict { color: var(--text); border-image: var(--grad) 1; animation: rise .5s var(--ease); }
 #summary.verdict b { margin-right: 8px; padding: 1px 9px; border-radius: 99px; background: var(--grad); color: var(--on-brand); font-size: 11.5px; font-weight: 800; }
 
-.top-ctl { display: flex; gap: 8px; align-items: center; }
+.top-ctl { flex: none; display: flex; gap: 8px; align-items: center; }
 .ghost, #menu, #tolearn { display: inline-flex; gap: 6px; align-items: center; height: 32px; padding: 0 11px; border: 1px solid var(--line); border-radius: 10px; background: color-mix(in srgb, var(--panel) 70%, transparent); font-size: 12.5px; color: var(--muted); white-space: nowrap; transition: border-color .2s, color .2s, background .2s, transform .15s; }
 #menu { flex: none; width: 34px; padding: 0; justify-content: center; }
 #menu:hover, #tolearn:hover { border-color: var(--line2); color: var(--text); }
@@ -165,7 +167,7 @@ select:hover { border-color: var(--line2); }
 .tone { font-size: 11px; font-weight: 750; padding: 2px 9px; border-radius: 7px; color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); white-space: nowrap; }
 
 /* ---------- 카드 ---------- */
-.cards { flex: 1; min-height: 0; display: grid; gap: 14px; }
+.cards { flex: 1; min-height: 0; display: grid; gap: 14px; container-type: inline-size; }
 .cards.side { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .card { position: relative; display: flex; flex-direction: column; min-height: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden; transition: opacity .4s, border-color .3s; animation: rise .55s var(--ease) both; animation-delay: calc(var(--i, 0) * 70ms + 60ms); }
 .card::before { content: ""; position: absolute; inset: 0 0 auto; height: 2px; background: linear-gradient(90deg, var(--c), var(--c2), transparent 85%); opacity: .9; z-index: 1; }
@@ -295,7 +297,7 @@ select:hover { border-color: var(--line2); }
 .edge[data-s="new"] { stroke: var(--new); stroke-width: 2; }
 
 /* ---------- 정리 ---------- */
-#learn { scroll-margin-top: 14px; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-top: 24px; }
+#learn { scroll-margin-top: calc(var(--head-h) + 14px); display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-top: 24px; }
 .box { position: relative; padding: 18px 20px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); }
 .box h3 { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 750; letter-spacing: -.01em; margin-bottom: 10px; }
 .box h3::before { content: ""; width: 4px; height: 14px; border-radius: 2px; background: var(--c, var(--grad)); }
@@ -317,7 +319,7 @@ th { font-size: 11.5px; color: var(--muted); font-weight: 500; }
 /* ---------- 증상으로 찾기 ---------- */
 .sym #score, .sym #tabs, .sym #cards, .sym #learn, .sym #pager, .sym #player, .sym .top-ctl { display: none; }
 .sym #stage { height: auto; min-height: 0; }
-#symview { display: grid; gap: 16px; margin-top: 6px; }
+#symview { display: grid; gap: 16px; }
 #symview[hidden] { display: none; }
 #symview > * { animation: rise .5s var(--ease) both; }
 .steps ol { margin: 0; padding: 0; list-style: none; counter-reset: s; display: grid; gap: 8px; }
@@ -332,7 +334,7 @@ a.chip:hover, button.chip:hover { border-color: var(--brand); color: var(--text)
 button.chip:active { transform: scale(.95); }
 .chip.on { background: var(--grad); border-color: transparent; color: var(--on-brand); font-weight: 700; }
 .tag { padding: 2px 9px; border-radius: 7px; font-size: 11px; font-weight: 700; color: var(--active); background: color-mix(in srgb, var(--active) 13%, transparent); }
-.symbar { position: sticky; top: 0; z-index: 3; display: grid; gap: 10px; padding: 12px 0; background: linear-gradient(180deg, var(--bg) 78%, transparent); }
+.symbar { position: sticky; top: var(--head-h); z-index: 3; display: grid; gap: 10px; padding: 12px 0; background: linear-gradient(180deg, var(--bg) 78%, transparent); }
 #symq { width: 100%; height: 44px; padding: 0 16px; border-radius: 12px; border: 1px solid var(--line2); background: var(--panel); color: var(--text); transition: border-color .2s, box-shadow .2s; }
 #symq:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand) 18%, transparent); }
 #symlist { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr)); gap: 16px; }
@@ -349,7 +351,7 @@ dd code, .sx code, .tri code { background: var(--panel3); padding: 1px 5px; bord
 .none { color: var(--muted); }
 
 /* ---------- 플레이어 ---------- */
-#player { position: fixed; left: 284px; right: 0; bottom: 0; z-index: 5; height: var(--player-h); display: flex; gap: 14px; align-items: center; padding: 0 28px; background: color-mix(in srgb, var(--panel) 78%, transparent); backdrop-filter: blur(18px) saturate(1.4); border-top: 1px solid var(--line); }
+#player { position: fixed; left: 284px; right: 0; bottom: 0; z-index: 7; height: var(--player-h); display: flex; gap: 14px; align-items: center; padding: 0 var(--gut); background: color-mix(in srgb, var(--panel) 78%, transparent); backdrop-filter: blur(18px) saturate(1.4); border-top: 1px solid var(--line); }
 .pl-btns { display: flex; gap: 6px; }
 #player button { display: inline-flex; gap: 6px; align-items: center; justify-content: center; min-width: 38px; height: 36px; padding: 0 12px; border-radius: 11px; border: 1px solid var(--line); background: var(--panel2); font-size: 13px; font-weight: 600; transition: border-color .2s, background .2s, transform .15s var(--ease), opacity .2s, box-shadow .25s; }
 #player button:hover:not(:disabled) { border-color: var(--line2); background: var(--panel3); }
@@ -372,6 +374,7 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; border: 1px solid 
 
 /* ---------- 움직임 ---------- */
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } }
+@keyframes fadein { from { opacity: 0; } }
 @keyframes pop { 0% { transform: scale(.5); opacity: 0; } 60% { opacity: 1; } }
 @keyframes drop { from { opacity: 0; transform: translate(-50%, -6px); } }
 @keyframes bump { 40% { transform: scale(1.35); color: var(--bad); } }
@@ -392,46 +395,67 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; border: 1px solid 
 @keyframes nring-e { from { stroke-width: 7; stroke-opacity: .35; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 
-/* ---------- 좁은 화면 ---------- */
-@media (max-width: 860px) {
+/* ---------- 반응형 ----------
+   넓음(1025px~): 목차가 옆에 고정.  중간(761~1024px): 목차는 서랍, 무대는 한 화면 유지.
+   좁음(~760px): 카드가 자연 높이로 쌓이고 헤더·점수판·플레이어만 고정. */
+@media (max-width: 1280px) { .keys { display: none; } }
+@media (max-width: 1024px) {
+  :root { --gut: 20px; }
   #app { grid-template-columns: minmax(0, 1fr); }
-  #side { position: fixed; z-index: 20; width: 288px; left: 0; background: var(--panel); transform: translateX(-100%); transition: transform .35s var(--ease); }
-  .nav-open #side { transform: none; box-shadow: 30px 0 60px -20px rgba(0, 0, 0, .6); }
-  .nav-open #scrim { display: block; position: fixed; inset: 0; z-index: 15; background: rgba(0, 0, 0, .55); backdrop-filter: blur(2px); animation: rise .25s; }
-  :root { --player-h: 104px; }
-  #main { grid-column: 1; padding: 0 16px 130px; }
+  #main { grid-column: 1; }
+  #side { position: fixed; z-index: 20; width: min(300px, 86vw); left: 0; background: var(--panel); transform: translateX(-100%); visibility: hidden; transition: transform .35s var(--ease), visibility 0s .35s; }
+  .nav-open #side { transform: none; visibility: visible; transition: transform .35s var(--ease); box-shadow: 30px 0 60px -20px rgba(0, 0, 0, .6); }
+  .nav-open #scrim { display: block; position: fixed; inset: 0; z-index: 15; background: rgba(0, 0, 0, .55); backdrop-filter: blur(2px); animation: fadein .25s; }
+  #player { left: 0; }
+  #tip { display: none; }
+  #tolearn span { display: none; }
+  #tolearn { width: 34px; padding: 0; justify-content: center; }
+}
+@media (max-width: 760px) {
+  :root { --gut: 14px; --player-h: 104px; }
+  #main { padding-bottom: 130px; }
+  #bar { gap: 10px; padding: 7px 0; }
+  .headline { flex-wrap: wrap; gap: 2px 8px; }
+  h1 { flex-basis: 100%; font-size: 16px; white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+  #param span, #tolearn { display: none; }
   #stage { height: auto; min-height: 0; }
-  #score { position: sticky; top: 6px; z-index: 4; padding: 7px 12px; background: color-mix(in srgb, var(--panel) 92%, transparent); backdrop-filter: blur(12px); }
-  .sc-r { gap: 8px; grid-template-columns: minmax(70px, 96px) repeat(var(--cols), minmax(0, 1fr)); }
+  #score { position: sticky; top: calc(var(--head-h) + 6px); z-index: 4; padding: 7px 12px; background: color-mix(in srgb, var(--panel) 92%, transparent); backdrop-filter: blur(12px); }
+  .sc-r { gap: 8px; grid-template-columns: minmax(64px, 96px) repeat(var(--cols), minmax(0, 1fr)); }
   .sc-c { gap: 6px; } .sc-c b { min-width: 0; font-size: 13px; }
   .cards { display: block; }
   .code { max-height: 232px; }
   .msg { height: auto; min-height: calc(4.65em + 16px); }
   .viz { flex: none; overflow: visible; }
   .tab { flex-direction: column; gap: 2px; height: auto; padding: 7px 8px; font-size: 13px; }
-  .keys, #tolearn, #tip { display: none; }
-  h1 { font-size: 19px; }
-  #player { left: 0; padding: 8px 12px; flex-wrap: wrap; gap: 6px 8px; align-content: center; }
+  #player { flex-wrap: wrap; gap: 6px 8px; align-content: center; }
   #scrub { order: -1; flex-basis: 100%; }
-  #player button.primary { min-width: 100px; }
+  #player button.primary { flex: 1; min-width: 96px; }
   .speed { margin-left: auto; }
-  .top-row { flex-wrap: wrap; }
-  .top-ctl { margin-left: auto; }
+  #learn { grid-template-columns: minmax(0, 1fr); }
+  .box, .sym-card { padding: 15px 16px; }
+  #pager { flex-direction: column; }
   .tri-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
   .symbar { position: static; }
+  dl { grid-template-columns: minmax(0, 1fr); gap: 2px; } dd { margin-bottom: 6px; }
+}
+@media (max-width: 400px) {
+  #b-prev, #b-next { font-size: 0; gap: 0; min-width: 42px; }
+  .speed { font-size: 0; } .speed select { font-size: 12.5px; }
+  #pos { display: none; }
 }
 
-/* 한 카드만 볼 때(방식이 하나이거나 "하나씩" 보기) 넓은 화면에서는 코드와 그림을 좌우로 놓는다 */
-@media (min-width: 1100px) {
+/* 한 카드만 볼 때(방식이 하나이거나 "하나씩" 보기) 카드가 충분히 넓으면 코드와 그림을 좌우로 놓는다 */
+@container (min-width: 820px) {
   .cards.one .body { flex-direction: row; }
   .cards.one .left { flex: 0 0 46%; border-right: 1px solid var(--line); }
   .cards.one .code { flex: 0 1 auto; }
   .cards.one .msg { flex: 1 0 auto; height: auto; min-height: calc(6.2em + 20px); max-height: 45%; border-bottom: 0; padding: 12px 16px; font-size: 15.5px; }
   .cards.one .viz { flex: 1 1 0; }
 }
-@media (min-width: 861px) and (max-height: 800px) {
-  #stage { gap: 8px; padding: 10px 0 8px; }
-  h1 { font-size: 18px; } #summary { font-size: 13px; }
+@media (min-width: 761px) and (max-height: 800px) {
+  #stage { gap: 8px; padding: 8px 0; }
+  #bar { min-height: 50px; padding: 7px 0; }
+  #summary { font-size: 13px; }
   #score { padding: 6px 14px; gap: 1px; } .sc-r { min-height: 20px; }
   .code { font-size: 12px; line-height: 1.6; } .cursor { height: 1.6em; } .msg { font-size: 13.5px; }
   .card > header { padding: 7px 12px 6px; }
