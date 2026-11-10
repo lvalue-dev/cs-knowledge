@@ -220,7 +220,7 @@ function set(key, value) {
     };
     const r = fib(n, null);
     t.step(memoized ? 6 : 3, `<code>fib(${n})</code> = <b>${r}</b>. 총 ${t.m[key]}번 호출했습니다.`, snap());
-    Object.assign(lay, CS.layoutTree(nodes));
+    Object.assign(lay, CS.layoutTree(nodes, 40, 46));
   };
   // 그래프 패널은 w/h가 필요하므로 추적이 끝난 뒤 계산된 배치를 각 스냅샷에 채운다
   const withLayout = (run) => (t, n) => {

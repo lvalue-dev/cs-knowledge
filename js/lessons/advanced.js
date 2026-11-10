@@ -11,7 +11,7 @@
     const name = (l) => { const r = Math.floor(l / 2), c = (l % 2) * LINE; return `m[${r}][${c}..${c + LINE - 1}]`; };
     const snap = (cr, cc, res) => [
       {
-        type: 'cells', cols: N, compact: true, title: `메모리 속 8×8 행렬 — 가로 ${LINE}칸이 캐시 라인 1개 (한 번에 통째로 읽어 옴)`,
+        type: 'cells', cols: N, tiny: true, title: `메모리 속 8×8 행렬 — 가로 ${LINE}칸이 캐시 라인 1개 (한 번에 통째로 읽어 옴)`,
         items: Array.from({ length: N * N }, (_, k) => {
           const r = Math.floor(k / N), c = k % N;
           return { id: k, v: '', gap: c === LINE - 1, s: r === cr && c === cc ? res : cache.includes(lineOf(r, c)) ? 'cmp' : seen.has(k) ? 'dim' : '' };

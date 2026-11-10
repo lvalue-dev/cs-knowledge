@@ -334,7 +334,7 @@ async function getRanking() {
           t.m['담당 서버가 바뀐 키'] = 0; t.m['캐시 적중률 (%)'] = 100;
           const at = (p, r) => ({ x: 130 + r * Math.sin((p / 100) * 2 * Math.PI), y: 118 - r * Math.cos((p / 100) * 2 * Math.PI) });
           const snap = (ring, moved = []) => [{
-            type: 'graph', w: 260, h: 250, scale: 1.7, title: '해시 공간을 원으로 놓고, 키는 시계 방향으로 처음 만나는 서버가 담당',
+            type: 'graph', w: 260, h: 250, scale: 1.3, title: '해시 공간을 원으로 놓고, 키는 시계 방향으로 처음 만나는 서버가 담당',
             nodes: [
               ...ring.map(([p, name]) => ({ id: name, v: name, ...at(p, 62), w: 30, s: name === 'S4' ? 'new' : 'cmp' })),
               ...KEYS.map((h) => ({ id: 'k' + h, v: h, ...at(h, 100), w: 24, round: true, sub: ringOwner(ring, h), s: moved.includes(h) ? 'bad' : ring.length === 4 ? 'done' : '' })),

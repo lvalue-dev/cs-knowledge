@@ -21,36 +21,48 @@
   </aside>
   <div id="scrim"></div>
   <main id="main">
-    <header class="top">
-      <button id="menu" type="button" aria-label="목차 열기">☰</button>
-      <div class="top-text">
-        <div class="crumbs"><span id="level" class="badge"></span><span id="pos"></span></div>
-        <h1 id="title"></h1>
+    <div id="stage">
+      <header class="top">
+        <div class="top-row">
+          <button id="menu" type="button" aria-label="목차 열기/접기" title="목차 열기/접기">☰</button>
+          <div class="headline"><h1 id="title"></h1><span id="level" class="badge"></span><span id="pos"></span></div>
+          <div class="top-ctl">
+            <button id="tip" type="button" hidden>그림이 작다면 목차 접기 ☰</button>
+            <div id="viewmode" class="seg" role="group" aria-label="보기 방식" hidden>
+              <button type="button" data-m="side" title="두 방식을 한 화면에 나란히">나란히</button>
+              <button type="button" data-m="focus" title="한 방식씩 크게">하나씩</button>
+            </div>
+            <label id="param" hidden><span></span><select></select></label>
+            <a id="tolearn" href="#learn">정리 · 증상 ↓</a>
+          </div>
+        </div>
         <p id="summary"></p>
-      </div>
-      <label id="param" hidden><span></span><select></select></label>
-    </header>
-    <section id="symview" hidden></section>
-    <section id="verdict" hidden></section>
-    <section id="cards" class="cards"></section>
+      </header>
+      <section id="symview" hidden></section>
+      <section id="score" aria-label="지표 비교"></section>
+      <nav id="tabs" hidden></nav>
+      <section id="cards" class="cards"></section>
+    </div>
     <section id="learn"></section>
     <nav id="pager"></nav>
   </main>
   <footer id="player">
+    <span id="tbar"></span>
     <div class="pl-btns">
-      <button id="b-reset" type="button" title="처음으로 (Home)">⏮</button>
-      <button id="b-prev" type="button" title="이전 단계 (←)">◀</button>
-      <button id="b-play" type="button" class="primary" title="재생/정지 (Space)">▶ 재생</button>
-      <button id="b-next" type="button" title="다음 단계 (→)">▶</button>
+      <button id="b-reset" type="button" title="처음으로 (Home)" aria-label="처음으로">⏮</button>
+      <button id="b-prev" type="button" title="이전 단계 (←)">◀ 이전</button>
+      <button id="b-play" type="button" class="primary" title="자동 재생/정지 (Space)">▶ 자동 재생</button>
+      <button id="b-next" type="button" title="다음 단계 (→)">다음 ▶</button>
     </div>
     <input id="scrub" type="range" min="0" max="0" value="0" aria-label="실행 단계">
     <span id="count">0 / 0</span>
-    <label class="speed">속도
+    <label class="speed">읽는 속도
       <select id="speed">
-        <option value="0.5">0.5×</option><option value="1" selected>1×</option>
-        <option value="2">2×</option><option value="4">4×</option><option value="8">8×</option>
+        <option value="0.5">천천히</option><option value="1" selected>보통</option>
+        <option value="1.5">조금 빠르게</option><option value="2.5">빠르게</option><option value="6">훑어보기</option>
       </select>
     </label>
+    <span class="keys">Space 재생 · ← → 한 단계</span>
   </footer>
 </div>
 <script src="js/engine.js"></script>

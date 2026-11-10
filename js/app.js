@@ -12,7 +12,7 @@
   const SVG = 'http://www.w3.org/2000/svg';
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  const state = { lesson: null, n: null, runs: [], idx: 0, total: 1, playing: false, speed: 1, timer: null };
+  const state = { lesson: null, n: null, runs: [], keys: [], idx: 0, total: 1, playing: false, speed: 1, timer: null, side: true, tab: 0 };
 
   const store = {
     get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
@@ -31,7 +31,7 @@
   function sync(parent, items, make, upd, flip = true) {
     const old = new Map(), first = new Map();
     for (const el of [...parent.children]) old.set(el.dataset.k, el);
-    const animate = flip && !reduced;
+    const animate = flip && !reduced && !state.measuring;
     if (animate) old.forEach((el, k) => first.set(k, el.getBoundingClientRect()));
     let prev = null;
     for (const it of items) {
@@ -51,7 +51,7 @@
     }
     old.forEach((el) => el.remove());
     if (!animate) return;
-    const dur = Math.min(320, (650 / state.speed) * 0.85);
+    const dur = Math.min(320, 420 / state.speed);
     for (const el of parent.children) {
       const f = first.get(el.dataset.k);
       if (!f) continue;
@@ -79,7 +79,7 @@
 
   const R = {
     cells(b, p) {
-      b.className = 'pb cells' + (p.bars ? ' bars' : '') + (p.items.length > 20 || p.compact ? ' compact' : '') + (p.cols ? ' grid' : '');
+      b.className = 'pb cells' + (p.bars ? ' bars' : '') + (p.tiny ? ' tiny' : p.items.length > 20 || p.compact ? ' compact' : '') + (p.cols ? ' grid' : '');
       b.style.gridTemplateColumns = p.cols ? `repeat(${p.cols}, max-content)` : '';
       sync(b, p.items, mkCell, (el, it) => {
         updCell(el, it);
@@ -129,7 +129,7 @@
         b.appendChild(svg);
       }
       svg.setAttribute('viewBox', `0 0 ${p.w} ${p.h}`);
-      svg.style.maxWidth = `${p.w * (p.scale || 1.25)}px`;
+      svg.style.setProperty('--gmax', `${p.w * (p.scale || 1.25)}px`);
       const at = (n) => (p.pos ? p.pos[n.id] : n);
       const byId = new Map(p.nodes.map((n) => [n.id, n]));
       const half = (n) => [(n.w || 32) / 2, 14];
@@ -219,6 +219,7 @@
     $('#level').className = 'badge';
     $('#pos').textContent = `${Object.keys(CS.diagnose).length}개 항목`;
     $('#title').textContent = '증상으로 찾기';
+    $('#summary').className = '';
     $('#summary').textContent = '디버깅하다 본 현상에서 출발합니다. 어떤 CS 개념의 문제인지, 무엇을 재 보면 확신할 수 있는지, 어느 방향으로 고쳐야 하는지를 정리했습니다.';
     document.title = '증상으로 찾기 — CS 보이는 코드';
     $('#param').hidden = true;
@@ -265,13 +266,13 @@
     $('#symview').hidden = true;
     state.lesson = lesson;
     state.n = lesson.param ? lesson.param.value : null;
+    state.tab = 0;
     const lv = LEVELS.find((l) => l[0] === lesson.level);
     const i = CS.lessons.indexOf(lesson);
     $('#level').textContent = lv[1];
     $('#level').className = 'badge ' + lesson.level;
     $('#pos').textContent = `${i + 1} / ${CS.lessons.length}`;
     $('#title').textContent = lesson.title;
-    $('#summary').textContent = lesson.summary;
     document.title = `${lesson.title} — CS 보이는 코드`;
 
     const pm = $('#param');
@@ -300,113 +301,232 @@
     scrollTo(0, 0);
   }
 
-  // 현재 입력 크기로 모든 방식을 실행해 단계를 만들고 카드 DOM을 새로 짠다
+  const textLen = (html) => html.replace(/<[^>]+>/g, '').length;
+  const shown = () => (state.side ? state.runs : [state.runs[state.tab]]);
+  const wantSide = () => {
+    if (state.runs.length < 2 || innerWidth < 860) return false;
+    const pref = store.get('cs-view');
+    return pref ? pref === 'side' : innerWidth >= 1180 && innerHeight >= 760; // 작은 화면은 '하나씩'이 기본
+  };
+
+  // 현재 입력 크기로 모든 방식을 실행해 단계를 만들고 카드·점수판 DOM을 새로 짠다
   function build() {
     const { lesson } = state;
     state.runs = lesson.variants.map((v) => ({ v, steps: CS.trace(v, state.n) }));
-    state.total = Math.max(...state.runs.map((r) => r.steps.length));
     state.maxHits = Math.max(1, ...state.runs.flatMap((r) => Object.values(r.steps[r.steps.length - 1].hits)));
     state.maxM = {};
+    state.keys = [];
     for (const r of state.runs)
-      for (const [k, v] of Object.entries(r.steps[r.steps.length - 1].m))
+      for (const [k, v] of Object.entries(r.steps[r.steps.length - 1].m)) {
+        if (!state.keys.includes(k)) state.keys.push(k);
         if (typeof v === 'number') state.maxM[k] = Math.max(state.maxM[k] || 0, v);
+      }
 
     const cards = $('#cards');
-    cards.className = 'cards n' + state.runs.length;
     cards.innerHTML = '';
     for (const r of state.runs) {
       const card = document.createElement('article');
       card.className = 'card ' + (r.v.tone || 'info');
       card.innerHTML = `
         <header><span class="tone">${esc(r.v.label || TONE[r.v.tone || 'info'])}</span><h2>${esc(r.v.name)}</h2><span class="status"></span></header>
-        <div class="code">${r.v.code.split('\n').map((line, i) =>
-          `<div class="ln" data-l="${i + 1}"><span class="heat"></span><span class="no">${i + 1}</span><code>${hl(line) || ' '}</code>${
-            r.v.notes && r.v.notes[i + 1] ? `<span class="note">${esc(r.v.notes[i + 1])}</span>` : ''}<span class="hits"></span></div>`).join('')}</div>
-        <p class="msg"></p>
-        <div class="viz"></div>
-        <div class="metrics">${Object.keys(r.steps[r.steps.length - 1].m).map((k) =>
-          `<div class="metric"><span class="mk">${esc(k)}</span><b class="mv"></b><span class="mbar"><i></i></span></div>`).join('')}</div>`;
+        <div class="body">
+          <div class="left">
+            <div class="code">${r.v.code.split('\n').map((line, i) =>
+              `<div class="ln" data-l="${i + 1}"><span class="heat"></span><span class="no">${i + 1}</span><code>${hl(line) || ' '}</code>${
+                r.v.notes && r.v.notes[i + 1] ? `<span class="note">${esc(r.v.notes[i + 1])}</span>` : ''}<span class="hits"></span></div>`).join('')}</div>
+            <p class="msg"></p>
+          </div>
+          <div class="viz"><div class="viz-in"></div></div>
+        </div>`;
       cards.appendChild(card);
       r.el = card;
       r.lines = [...card.querySelectorAll('.ln')];
+      r.codeEl = $('.code', card);
+      r.msgEl = $('.msg', card);
+      r.vizEl = $('.viz-in', card);
     }
-    state.idx = 0;
+
+    // 점수판: 모든 방식의 지표를 같은 눈금으로 한 줄에 놓아 비교한다
+    const tone = (r) => r.v.tone || 'info';
+    $('#score').style.setProperty('--cols', state.runs.length);
+    $('#score').innerHTML = state.keys.length ? `
+      <div class="sc-r sc-h"><span></span>${state.runs.map((r) => `<span class="sc-n ${tone(r)}"><i></i>${esc(r.v.name)}<em></em></span>`).join('')}</div>
+      ${state.keys.map((k) => `<div class="sc-r"><span class="sc-k">${esc(k)}<b class="ratio" hidden></b></span>${state.runs.map((r) =>
+        `<span class="sc-c ${tone(r)}"><span class="mbar"><i></i></span><b></b></span>`).join('')}</div>`).join('')}` : '';
+    $('#tabs').innerHTML = state.runs.map((r, i) => `<button type="button" class="tab ${tone(r)}" data-i="${i}"><span class="tone">${esc(r.v.label || TONE[tone(r)])}</span>${esc(r.v.name)}</button>`).join('');
+    layout(true);
+  }
+
+  // 보기 방식(나란히 / 하나씩)에 맞춰 보이는 카드와 전체 단계 수를 정한다
+  function layout(reset) {
+    state.side = wantSide();
+    const multi = state.runs.length > 1;
+    $('#viewmode').hidden = !multi || innerWidth < 860;
+    for (const b of $('#viewmode').children) b.classList.toggle('on', (b.dataset.m === 'side') === state.side);
+    $('#tabs').hidden = !multi || state.side;
+    [...$('#tabs').children].forEach((b, i) => b.classList.toggle('on', i === state.tab));
+    $('#cards').className = 'cards ' + (state.side ? 'side' : 'one');
+    state.runs.forEach((r, i) => { r.el.hidden = !state.side && i !== state.tab; });
+    state.total = Math.max(...shown().map((r) => r.steps.length));
+    state.idx = reset ? 0 : Math.min(state.idx, state.total - 1);
     $('#scrub').max = state.total - 1;
+    render();
+    fitViz();
+  }
+
+  // 한 화면 안에서 코드와 그림이 차지할 높이를 나누고, 그래도 넘치면 그림을 축소한다.
+  // 단계마다 크기가 흔들리지 않게, 여러 시점을 미리 그려 가장 큰 높이를 기준으로 레슨당 한 번만 계산한다.
+  function fitViz() {
+    state.measuring = true;
+    let minZoom = 1;
+    for (const r of state.runs) {
+      const inner = r.vizEl, box = inner.parentNode, left = r.codeEl.parentNode, body = left.parentNode;
+      inner.style.zoom = ''; box.style.flex = ''; left.style.flex = ''; inner.style.removeProperty('--w');
+      r.el.classList.remove('scrolls');
+      if (r.el.hidden || getComputedStyle(box).overflowY === 'visible') continue; // 좁은 화면: 카드가 자연 높이라 맞출 필요 없음
+      const last = r.steps.length - 1;
+      const need = (z) => {
+        inner.style.zoom = z === 1 ? '' : z;
+        let h = 0;
+        for (const f of [0, 0.25, 0.5, 0.75, 1]) { renderPanels(inner, r.steps[Math.round(last * f)].panels); h = Math.max(h, inner.getBoundingClientRect().height); }
+        return h;
+      };
+      const cs = getComputedStyle(box), pad = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+      inner.style.setProperty('--w', `${inner.clientWidth}px`);
+      const full = need(1);
+      if (getComputedStyle(body).flexDirection !== 'row') {
+        // 위아래 배치: 둘 다 들어가면 남는 높이는 그림에. 모자라면 그림을 조금 줄이고, 그래도 모자라면
+        // 코드를 최소 6줄 남기고 스크롤시킨다(실행 줄을 따라감)
+        const bodyH = body.clientHeight, msgH = r.msgEl.offsetHeight, codeH = r.codeEl.scrollHeight + 2;
+        const soft = full * 0.8 + pad; // 그림은 80%까지는 줄여도 읽기에 무리가 없다
+        const vizH = soft + msgH + codeH <= bodyH ? bodyH - msgH - codeH
+          : Math.max(bodyH * 0.38, Math.min(soft, bodyH - msgH - Math.min(codeH, 132)));
+        box.style.flex = `0 0 ${vizH}px`;
+        left.style.flex = '1 1 0';
+      }
+      const avail = box.clientHeight - pad;
+      if (full > avail + 1) {
+        let lo = 0.55, hi = 1;
+        if (need(lo) <= avail + 1) for (let k = 0; k < 6; k++) { const mid = (lo + hi) / 2; if (need(mid) <= avail + 1) lo = mid; else hi = mid; }
+        if (need(lo) > avail + 1) r.el.classList.add('scrolls');
+        minZoom = Math.min(minZoom, lo);
+      }
+    }
+    state.measuring = false;
+    // 그림이 많이 줄었고 목차가 펼쳐져 있으면, 목차를 접어 넓게 볼 수 있다고 알려 준다
+    $('#tip').hidden = !(minZoom < 0.75 && state.side && !document.body.classList.contains('nav-off'));
     render();
   }
 
   function render() {
-    const { idx } = state;
-    for (const r of state.runs) {
+    const { idx, lesson } = state;
+    const end = idx >= state.total - 1;
+    state.runs.forEach((r, i) => {
+      if (r.el.hidden) return;
       const last = r.steps.length - 1, s = r.steps[Math.min(idx, last)], fin = idx >= last;
+      let on = null;
       for (const ln of r.lines) {
         const no = +ln.dataset.l, h = s.hits[no] || 0;
         ln.classList.toggle('on', s.line === no);
+        if (s.line === no) on = ln;
         ln.style.setProperty('--heat', h / state.maxHits);
         ln.lastChild.textContent = h ? `×${h}` : '';
       }
-      $('.msg', r.el).innerHTML = s.msg;
-      renderPanels($('.viz', r.el), s.panels);
-      const keys = Object.keys(r.steps[last].m);
-      [...r.el.querySelectorAll('.metric')].forEach((el, i) => {
-        const v = s.m[keys[i]] ?? 0;
-        el.children[1].textContent = fmt(v);
-        const max = state.maxM[keys[i]];
-        el.children[2].hidden = !max;
-        if (max) el.children[2].firstChild.style.width = `${(v / max) * 100}%`;
-      });
-      r.el.classList.toggle('fin', fin);
+      // 실행 중인 줄이 코드 창 밖에 있으면 창 안으로 스크롤한다 (페이지는 움직이지 않게)
+      const box = r.codeEl;
+      if (on && (on.offsetTop < box.scrollTop || on.offsetTop + on.offsetHeight > box.scrollTop + box.clientHeight))
+        box.scrollTop = on.offsetTop - box.clientHeight / 2;
+      if (r.msgEl.dataset.h !== s.msg) {
+        r.msgEl.dataset.h = s.msg;
+        r.msgEl.innerHTML = s.msg;
+        r.msgEl.scrollTop = 0;
+        r.msgEl.classList.remove('flash');
+        void r.msgEl.offsetWidth;
+        r.msgEl.classList.add('flash');
+      }
+      renderPanels(r.vizEl, s.panels);
+      r.el.classList.toggle('fin', fin && state.side && !end);
       $('.status', r.el).textContent = fin ? `완료 · ${last + 1}단계` : `${Math.min(idx, last) + 1} / ${last + 1}단계`;
+    });
+
+    // 점수판. "하나씩" 보기에서는 보이지 않는 방식의 최종 결과를 기준선으로 보여 준다
+    const rows = [...document.querySelectorAll('#score .sc-r')];
+    if (rows.length) {
+      state.runs.forEach((r, i) => { rows[0].children[i + 1].lastChild.textContent = state.side || i === state.tab ? '' : ' · 최종 결과'; });
+      state.keys.forEach((k, ki) => {
+        const cells = rows[ki + 1].children;
+        state.runs.forEach((r, i) => {
+          const last = r.steps.length - 1, live = state.side || i === state.tab;
+          const v = r.steps[live ? Math.min(idx, last) : last].m[k];
+          const cell = cells[i + 1], max = state.maxM[k];
+          cell.classList.toggle('ref', !live);
+          cell.lastChild.textContent = v === undefined ? '–' : fmt(v);
+          cell.firstChild.style.visibility = max && typeof v === 'number' ? '' : 'hidden';
+          if (max && typeof v === 'number') cell.firstChild.firstChild.style.width = `${(v / max) * 100}%`;
+        });
+        const chip = cells[0].lastChild;
+        const vals = state.runs.map((r) => r.steps[r.steps.length - 1].m[k]);
+        const hi = Math.max(...vals), lo = Math.min(...vals);
+        chip.hidden = !(end && k === lesson.headline && vals.length === 2 && lo > 0 && hi > lo);
+        if (!chip.hidden) chip.textContent = `${(hi / lo).toFixed(hi / lo >= 10 ? 0 : 1)}배 차이`;
+      });
     }
+
+    // 머리말 자리: 진행 중에는 소개, 끝나면 결론
+    const sum = $('#summary');
+    sum.classList.toggle('verdict', end);
+    if (end) sum.innerHTML = `<b>결론</b> ${lesson.verdict}`; else sum.textContent = lesson.summary;
+
     $('#scrub').value = idx;
-    $('#scrub').style.setProperty('--p', `${(idx / Math.max(1, state.total - 1)) * 100}%`);
     $('#count').textContent = `${idx + 1} / ${state.total}`;
-    const end = idx >= state.total - 1;
-    $('#b-play').textContent = state.playing ? '❚❚ 정지' : end ? '↺ 다시 보기' : '▶ 재생';
-    renderVerdict(end);
-    if (end && !done.has(state.lesson.id)) {
-      done.add(state.lesson.id);
+    $('#b-play').textContent = state.playing ? '❚❚ 정지' : end ? '↺ 처음부터' : '▶ 자동 재생';
+    $('#b-prev').disabled = idx === 0;
+    $('#b-next').disabled = end;
+    if (end && !done.has(lesson.id)) {
+      done.add(lesson.id);
       store.set('cs-done', [...done]);
       markNav();
     }
   }
 
-  function renderVerdict(end) {
-    const el = $('#verdict'), { lesson, runs } = state;
-    el.hidden = !end;
-    if (!end) return;
-    const key = lesson.headline;
-    const vals = key ? runs.map((r) => r.steps[r.steps.length - 1].m[key]) : [];
-    let html = '';
-    if (vals.length === 2) {
-      const [hi, lo] = [Math.max(...vals), Math.min(...vals)];
-      html += `<div class="vs"><span class="vk">${esc(key)}</span>${runs.map((r, i) =>
-        `<span class="vv ${r.v.tone || ''}"><b>${fmt(vals[i])}</b>${esc(r.v.name)}</span>`).join('<span class="vsx">vs</span>')}${
-        lo > 0 && hi > lo ? `<span class="ratio">${(hi / lo).toFixed(hi / lo >= 10 ? 0 : 1)}배 차이</span>` : ''}</div>`;
-    }
-    el.innerHTML = html + `<p>${lesson.verdict}</p>`;
-  }
-
   /* ---------- 플레이어 ---------- */
+  const tbar = $('#tbar');
+  const barStop = () => { tbar.style.transition = 'none'; tbar.style.width = '0'; };
+  function barStart(ms) {
+    barStop();
+    void tbar.offsetWidth;
+    tbar.style.transition = `width ${ms}ms linear`;
+    tbar.style.width = '100%';
+  }
+  // 지금 화면에 새로 나온 설명의 글자 수만큼 기다린다. 글이 길면 오래, 짧으면 금방 넘어간다
+  function readTime() {
+    let chars = 0;
+    for (const r of shown()) if (state.idx < r.steps.length) chars += textLen(r.steps[state.idx].msg);
+    return Math.min(10000, Math.max(900, 500 + chars * 48)) / state.speed;
+  }
   function go(i) {
     state.idx = Math.max(0, Math.min(state.total - 1, i));
     render();
   }
-  function tick() {
-    if (state.idx >= state.total - 1) return pause();
-    go(state.idx + 1);
-    state.timer = setTimeout(tick, 650 / state.speed);
+  function schedule() {
+    clearTimeout(state.timer);
+    const ms = readTime();
+    barStart(ms);
+    state.timer = setTimeout(() => {
+      go(state.idx + 1);
+      if (state.idx >= state.total - 1) pause(); else schedule();
+    }, ms);
   }
   function play() {
     if (state.idx >= state.total - 1) state.idx = 0;
     state.playing = true;
     render();
-    clearTimeout(state.timer);
-    state.timer = setTimeout(tick, 650 / state.speed);
+    schedule();
   }
   function pause() {
     state.playing = false;
     clearTimeout(state.timer);
+    barStop();
     if (state.lesson && state.runs.length) render();
   }
   const toggle = () => (state.playing ? pause() : play());
@@ -416,9 +536,37 @@
   $('#b-next').onclick = () => { pause(); go(state.idx + 1); };
   $('#b-reset').onclick = () => { pause(); go(0); };
   $('#scrub').oninput = (e) => { const v = +e.target.value; pause(); go(v); };
-  $('#speed').onchange = (e) => { state.speed = +e.target.value; };
+  $('#speed').onchange = (e) => { state.speed = +e.target.value; store.set('cs-speed', state.speed); if (state.playing) schedule(); };
+  $('#viewmode').onclick = (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    pause();
+    store.set('cs-view', b.dataset.m);
+    layout(false);
+  };
+  $('#tabs').onclick = (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    pause();
+    state.tab = +b.dataset.i;
+    layout(true);
+  };
+  $('#tolearn').onclick = (e) => { e.preventDefault(); $('#learn').scrollIntoView({ behavior: reduced ? 'auto' : 'smooth' }); };
+  let rz;
+  addEventListener('resize', () => {
+    clearTimeout(rz);
+    rz = setTimeout(() => {
+      if (!state.lesson) return;
+      if (wantSide() !== state.side) { pause(); layout(false); } else fitViz();
+    }, 150);
+  });
   $('#param select').onchange = (e) => { pause(); state.n = +e.target.value; build(); };
-  $('#menu').onclick = () => document.body.classList.toggle('nav-open');
+  $('#tip').onclick = () => $('#menu').click();
+  $('#menu').onclick = () => {
+    if (innerWidth <= 860) return document.body.classList.toggle('nav-open');
+    store.set('cs-nav-off', document.body.classList.toggle('nav-off')); // 넓은 화면: 목차를 접어 무대를 넓힌다
+    if (state.lesson) fitViz();
+  };
   $('#scrim').onclick = () => document.body.classList.remove('nav-open');
   $('#theme').onclick = () => {
     const cur = document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
@@ -437,6 +585,9 @@
   });
   addEventListener('hashchange', () => load(location.hash.slice(1)));
 
+  if (store.get('cs-nav-off')) document.body.classList.add('nav-off');
+  const sp = store.get('cs-speed');
+  if (sp && $(`#speed option[value="${sp}"]`)) { state.speed = sp; $('#speed').value = sp; }
   const theme = store.get('cs-theme');
   if (theme) document.documentElement.dataset.theme = theme;
   CS.lessons.sort((a, b) => LEVELS.findIndex((l) => l[0] === a.level) - LEVELS.findIndex((l) => l[0] === b.level));
