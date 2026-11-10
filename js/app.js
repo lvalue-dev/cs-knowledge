@@ -12,6 +12,22 @@
   const SVG = 'http://www.w3.org/2000/svg';
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  const ic = (d) => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
+  const IC = {
+    menu: ic('<path d="M4 6h16M4 12h16M4 18h16"/>'),
+    search: ic('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>'),
+    theme: ic('<path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z"/>'),
+    down: ic('<path d="M12 5v14M6 13l6 6 6-6"/>'),
+    first: ic('<path d="M6 5v14M19 6l-9 6 9 6z"/>'),
+    prev: ic('<path d="m15 6-6 6 6 6"/>'),
+    next: ic('<path d="m9 6 6 6-6 6"/>'),
+    play: ic('<path d="M7 5l12 7-12 7z" fill="currentColor"/>'),
+    pause: ic('<path d="M8 5v14M16 5v14"/>'),
+    replay: ic('<path d="M4 12a8 8 0 1 0 2.6-5.9M4 4v5h5"/>'),
+  };
+  for (const el of document.querySelectorAll('[data-ic]')) el.outerHTML = IC[el.dataset.ic];
+  const EASE = 'cubic-bezier(.22,1,.36,1)';
+
   const state = { lesson: null, n: null, runs: [], keys: [], idx: 0, total: 1, playing: false, speed: 1, timer: null, side: true, tab: 0 };
 
   const store = {
@@ -27,12 +43,16 @@
     c ? `<i class="t-c">${c}</i>` : s ? `<i class="t-s">${s}</i>` : n ? `<i class="t-n">${n}</i>` : `<i class="t-k">${k}</i>`);
   const fmt = (v) => (typeof v === 'number' ? v.toLocaleString('ko-KR') : v);
 
-  /* ---------- 키 기반 DOM 동기화 + FLIP 이동 애니메이션 ---------- */
-  function sync(parent, items, make, upd, flip = true) {
+  /* ---------- 키 기반 DOM 동기화 + 이동/등장/퇴장 애니메이션 ----------
+     - 자리를 옮긴 요소는 이전 위치에서 새 위치로 미끄러진다(FLIP). 좌우로 엇갈리는 교환은 호를 그리며 비켜 간다.
+     - 사라지는 요소는 제자리에서 줄어들며 사라진다.
+     위치는 offsetLeft/Top(레이아웃 좌표)으로 재서 그림이 축소(zoom)되어 있어도 어긋나지 않는다. */
+  function sync(parent, items, make, upd, flip = true, onEnter) {
     const old = new Map(), first = new Map();
-    for (const el of [...parent.children]) old.set(el.dataset.k, el);
-    const animate = flip && !reduced && !state.measuring;
-    if (animate) old.forEach((el, k) => first.set(k, el.getBoundingClientRect()));
+    const svg = parent instanceof SVGElement;
+    const animate = !reduced && !state.measuring;
+    for (const el of [...parent.children]) if (!el.dataset.leaving) old.set(el.dataset.k, el);
+    if (animate && !svg) old.forEach((el, k) => first.set(k, [el.offsetLeft, el.offsetTop, el.offsetWidth, el.offsetHeight]));
     let prev = null;
     for (const it of items) {
       const k = String(it.id);
@@ -41,24 +61,41 @@
       else {
         el = make(it);
         el.dataset.k = k;
-        el.classList.add('enter');
-        el.addEventListener('animationend', () => el.classList.remove('enter'), { once: true });
+        el._new = true;
+        if (!svg) {
+          el.classList.add('enter');
+          el.addEventListener('animationend', () => el.classList.remove('enter'), { once: true });
+        }
       }
       upd(el, it);
       const want = prev ? prev.nextSibling : parent.firstChild;
       if (el !== want) parent.insertBefore(el, want);
+      if (el._new) { el._new = false; if (animate && onEnter) onEnter(el, it); }
       prev = el;
     }
-    old.forEach((el) => el.remove());
-    if (!animate) return;
-    const dur = Math.min(320, 420 / state.speed);
+    const dur = Math.max(180, Math.min(460, 520 / state.speed));
+    old.forEach((el, k) => {
+      const f = first.get(k);
+      if (!animate || (!svg && !f)) return el.remove();
+      el.dataset.leaving = '1';
+      delete el.dataset.k;
+      parent.appendChild(el); // 남은 요소들의 순서 계산에 끼어들지 않게 맨 뒤로
+      if (!svg) Object.assign(el.style, { position: 'absolute', left: `${f[0]}px`, top: `${f[1]}px`, width: `${f[2]}px`, height: `${f[3]}px`, margin: 0, pointerEvents: 'none' });
+      el.animate(svg ? [{ opacity: 1 }, { opacity: 0 }] : [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.55)' }], { duration: dur * 0.6, easing: 'ease-in', fill: 'forwards' }).onfinish = () => el.remove();
+    });
+    if (!animate || !flip || svg) return;
     for (const el of parent.children) {
       const f = first.get(el.dataset.k);
       if (!f) continue;
-      const l = el.getBoundingClientRect();
-      const dx = f.left - l.left, dy = f.top - l.top;
-      if (Math.abs(dx) > 1 || Math.abs(dy) > 1)
-        el.animate([{ transform: `translate(${dx}px,${dy}px)` }, { transform: 'none' }], { duration: dur, easing: 'ease-out' });
+      const dx = f[0] - el.offsetLeft, dy = f[1] - el.offsetTop;
+      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
+      // 좌우 이동이면 가운데에서 살짝 떠올랐다(오른쪽으로 갈 때) 가라앉는(왼쪽으로 갈 때) 호를 그린다
+      const lift = Math.abs(dy) < 2 && Math.abs(dx) > 8 ? Math.min(16, Math.abs(dx) * 0.3) * (dx < 0 ? -1 : 1) : 0;
+      el.animate([
+        { transform: `translate(${dx}px,${dy}px)`, zIndex: 2 },
+        ...(lift ? [{ transform: `translate(${dx / 2}px,${lift}px)`, zIndex: 2 }] : []),
+        { transform: 'none', zIndex: 2 },
+      ], { duration: dur, easing: EASE });
     }
   }
 
@@ -72,7 +109,13 @@
   const updCell = (el, it) => {
     el.dataset.s = it.s || '';
     el.children[0].textContent = it.ptr || '';
-    el.children[1].textContent = it.v ?? '';
+    const v = String(it.v ?? ''), vEl = el.children[1];
+    if (vEl.textContent !== v) {
+      const had = vEl.textContent !== '' && !el.classList.contains('enter');
+      vEl.textContent = v;
+      // 값이 바뀌면 숫자가 위에서 굴러 내려온다
+      if (had && !reduced && !state.measuring) vEl.animate([{ transform: 'translateY(-70%)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 300, easing: EASE });
+    }
     el.children[2].textContent = it.sub ?? '';
     el.style.marginRight = it.gap ? '12px' : '';
   };
@@ -147,9 +190,12 @@
             d += `M${x2 - ux * s - uy * s * 0.6} ${y2 - uy * s + ux * s * 0.6}L${x2} ${y2}L${x2 - ux * s + uy * s * 0.6} ${y2 - uy * s - ux * s * 0.6}`;
           }
           el.setAttribute('d', d);
-          el.setAttribute('class', 'edge' + (el.classList.contains('enter') ? ' enter' : ''));
+          el.setAttribute('class', 'edge');
           el.dataset.s = e.s || '';
-        }, false);
+        }, false, (el) => { // 새 간선은 출발점에서 도착점으로 그려진다
+          const L = el.getTotalLength();
+          el.animate([{ strokeDasharray: `${L} ${L}`, strokeDashoffset: L }, { strokeDasharray: `${L} ${L}`, strokeDashoffset: 0 }], { duration: 460, easing: EASE });
+        });
       sync(svg.children[1], p.nodes, () => {
         const g = document.createElementNS(SVG, 'g');
         g.append(document.createElementNS(SVG, 'rect'), document.createElementNS(SVG, 'text'), document.createElementNS(SVG, 'text'));
@@ -165,7 +211,10 @@
         t.textContent = n.v; t.setAttribute('y', 4);
         sub.textContent = n.sub || ''; sub.setAttribute('class', 'nsub' + (n.side ? ' side' : ''));
         sub.setAttribute('x', n.side ? hw + 4 : 0); sub.setAttribute('y', n.side ? 3 : hh + 12);
-      }, false);
+      }, false, (g, n) => { // 새 노드는 제자리에서 튀어나온다
+        const { x, y } = at(n), t = `translate(${x}px,${y}px)`;
+        g.animate([{ transform: `${t} scale(.3)`, opacity: 0 }, { transform: `${t} scale(1.12)`, opacity: 1, offset: 0.6 }, { transform: `${t} scale(1)`, opacity: 1 }], { duration: 440, easing: EASE });
+      });
     },
   };
 
@@ -188,11 +237,12 @@
   }
 
   /* ---------- 레슨 로드 ---------- */
+  const CHK = '<svg class="chk" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M5 8.3l2.1 2.1L11 6.2"/></svg>';
   function buildNav() {
     $('#nav').innerHTML = LEVELS.map(([key, name, desc]) => {
       const items = CS.lessons.filter((l) => l.level === key);
-      return `<div class="group"><h2><span class="badge ${key}">${name}</span><small>${desc}</small></h2>${items.map((l) =>
-        `<a href="#${l.id}" data-id="${l.id}"><span class="chk"></span>${esc(l.title)}</a>`).join('')}</div>`;
+      return `<div class="group" data-lv="${key}"><h2><span class="badge ${key}">${name}</span><small>${desc}</small><span class="cnt"></span></h2><div class="lvbar"><i></i></div>${items.map((l) =>
+        `<a href="#${l.id}" data-id="${l.id}">${CHK}${esc(l.title)}</a>`).join('')}</div>`;
     }).join('');
     markNav();
   }
@@ -201,6 +251,14 @@
       a.classList.toggle('cur', !!state.lesson && a.dataset.id === state.lesson.id);
       a.classList.toggle('done', done.has(a.dataset.id));
     }
+    for (const g of document.querySelectorAll('#nav .group')) {
+      const all = CS.lessons.filter((l) => l.level === g.dataset.lv), n = all.filter((l) => done.has(l.id)).length;
+      $('.cnt', g).textContent = `${n}/${all.length}`;
+      $('.lvbar i', g).style.width = `${(n / all.length) * 100}%`;
+    }
+    const total = CS.lessons.length, n = CS.lessons.filter((l) => done.has(l.id)).length;
+    $('#prog b').textContent = `${n} / ${total}`;
+    $('#prog .lvbar i').style.width = `${(n / total) * 100}%`;
     $('#symlink').classList.toggle('cur', !state.lesson);
     const cur = $('#nav a.cur');
     if (cur) cur.scrollIntoView({ block: 'nearest' });
@@ -226,7 +284,7 @@
     const view = $('#symview');
     view.hidden = false;
     view.innerHTML = `
-      <div class="box steps"><h3>원인을 좁히는 순서</h3><ol>${CS.method.map((m) => `<li><b>${m[0]}</b> ${m[1]}</li>`).join('')}</ol></div>
+      <div class="box steps"><h3>원인을 좁히는 순서</h3><ol>${CS.method.map((m) => `<li><span><b>${m[0]}</b> ${m[1]}</span></li>`).join('')}</ol></div>
       <div class="box"><h3>1차 분류: 관찰한 것으로 영역 좁히기</h3>
         <div class="tri">${CS.triage.map((t) => `<div class="tri-row"><div><b>${t.see}</b></div><div>${t.suspect}</div><div class="chips">${t.lessons.map(lessonLink).join('')}</div></div>`).join('')}</div></div>
       <div class="symbar"><input id="symq" type="search" placeholder="현상을 검색해 보세요 (예: 타임아웃, 메모리, 중복, 느려)" aria-label="증상 검색">
@@ -324,16 +382,17 @@
 
     const cards = $('#cards');
     cards.innerHTML = '';
-    for (const r of state.runs) {
+    state.runs.forEach((r, ri) => {
       const card = document.createElement('article');
       card.className = 'card ' + (r.v.tone || 'info');
+      card.style.setProperty('--i', ri);
       card.innerHTML = `
         <header><span class="tone">${esc(r.v.label || TONE[r.v.tone || 'info'])}</span><h2>${esc(r.v.name)}</h2><span class="status"></span></header>
         <div class="body">
           <div class="left">
-            <div class="code">${r.v.code.split('\n').map((line, i) =>
+            <div class="code"><div class="lines"><span class="cursor"></span>${r.v.code.split('\n').map((line, i) =>
               `<div class="ln" data-l="${i + 1}"><span class="heat"></span><span class="no">${i + 1}</span><code>${hl(line) || ' '}</code>${
-                r.v.notes && r.v.notes[i + 1] ? `<span class="note">${esc(r.v.notes[i + 1])}</span>` : ''}<span class="hits"></span></div>`).join('')}</div>
+                r.v.notes && r.v.notes[i + 1] ? `<span class="note">${esc(r.v.notes[i + 1])}</span>` : ''}<span class="hits"></span></div>`).join('')}</div></div>
             <p class="msg"></p>
           </div>
           <div class="viz"><div class="viz-in"></div></div>
@@ -344,7 +403,8 @@
       r.codeEl = $('.code', card);
       r.msgEl = $('.msg', card);
       r.vizEl = $('.viz-in', card);
-    }
+      r.cursor = $('.cursor', card);
+    });
 
     // 점수판: 모든 방식의 지표를 같은 눈금으로 한 줄에 놓아 비교한다
     const tone = (r) => r.v.tone || 'info';
@@ -418,6 +478,25 @@
     render();
   }
 
+  // 점수판 숫자는 이전 값에서 새 값으로 굴러 올라간다
+  function count(el, to) {
+    cancelAnimationFrame(el._raf);
+    if (typeof to !== 'number' || reduced || state.measuring || typeof el._v !== 'number' || el._v === to) {
+      el._v = to;
+      el.textContent = to === undefined ? '–' : fmt(to);
+      return;
+    }
+    const from = el._v, t0 = performance.now(), dur = Math.min(420, 120 + Math.abs(to - from) * 30);
+    const frac = Number.isInteger(to) && Number.isInteger(from);
+    const tick = (now) => {
+      const k = Math.min(1, (now - t0) / dur), e = 1 - (1 - k) ** 3, v = from + (to - from) * e;
+      el.textContent = fmt(k === 1 ? to : frac ? Math.round(v) : +v.toFixed(1));
+      if (k < 1) el._raf = requestAnimationFrame(tick); else el._v = to;
+    };
+    el._v = to; // 중간에 다시 불려도 목표값을 기준으로 이어 간다
+    el._raf = requestAnimationFrame(tick);
+  }
+
   function render() {
     const { idx, lesson } = state;
     const end = idx >= state.total - 1;
@@ -430,23 +509,33 @@
         ln.classList.toggle('on', s.line === no);
         if (s.line === no) on = ln;
         ln.style.setProperty('--heat', h / state.maxHits);
-        ln.lastChild.textContent = h ? `×${h}` : '';
+        const hits = ln.lastChild, txt = h ? `×${h}` : '';
+        if (hits.textContent !== txt) {
+          const up = h > (hits._n || 0);
+          hits.textContent = txt; hits._n = h;
+          if (up && !state.measuring) { hits.classList.remove('bump'); void hits.offsetWidth; hits.classList.add('bump'); } // 실행될 때마다 횟수가 톡 튄다
+        }
       }
-      // 실행 중인 줄이 코드 창 밖에 있으면 창 안으로 스크롤한다 (페이지는 움직이지 않게)
+      // 실행 줄 커서가 다음 줄로 미끄러져 간다. 줄이 코드 창 밖이면 창 안으로 스크롤한다 (페이지는 움직이지 않게)
       const box = r.codeEl;
-      if (on && (on.offsetTop < box.scrollTop || on.offsetTop + on.offsetHeight > box.scrollTop + box.clientHeight))
-        box.scrollTop = on.offsetTop - box.clientHeight / 2;
+      r.cursor.classList.toggle('show', !!on);
+      if (on) {
+        r.cursor.style.transform = `translateY(${on.offsetTop}px)`;
+        const top = on.offsetTop + on.offsetParent.offsetTop;
+        if (top < box.scrollTop || top + on.offsetHeight > box.scrollTop + box.clientHeight)
+          box.scrollTo({ top: top - box.clientHeight / 2, behavior: reduced || state.measuring ? 'auto' : 'smooth' });
+      }
       if (r.msgEl.dataset.h !== s.msg) {
         r.msgEl.dataset.h = s.msg;
         r.msgEl.innerHTML = s.msg;
         r.msgEl.scrollTop = 0;
-        r.msgEl.classList.remove('flash');
-        void r.msgEl.offsetWidth;
-        r.msgEl.classList.add('flash');
+        if (!reduced && !state.measuring) r.msgEl.animate([{ opacity: 0, transform: 'translateY(7px)' }, { opacity: 1, transform: 'none' }], { duration: 320, easing: EASE });
       }
       renderPanels(r.vizEl, s.panels);
       r.el.classList.toggle('fin', fin && state.side && !end);
-      $('.status', r.el).textContent = fin ? `완료 · ${last + 1}단계` : `${Math.min(idx, last) + 1} / ${last + 1}단계`;
+      const st = $('.status', r.el);
+      st.classList.toggle('end', fin);
+      st.textContent = fin ? `완료 · ${last + 1}단계` : `${Math.min(idx, last) + 1} / ${last + 1}단계`;
     });
 
     // 점수판. "하나씩" 보기에서는 보이지 않는 방식의 최종 결과를 기준선으로 보여 준다
@@ -460,7 +549,7 @@
           const v = r.steps[live ? Math.min(idx, last) : last].m[k];
           const cell = cells[i + 1], max = state.maxM[k];
           cell.classList.toggle('ref', !live);
-          cell.lastChild.textContent = v === undefined ? '–' : fmt(v);
+          count(cell.lastChild, v);
           cell.firstChild.style.visibility = max && typeof v === 'number' ? '' : 'hidden';
           if (max && typeof v === 'number') cell.firstChild.firstChild.style.width = `${(v / max) * 100}%`;
         });
@@ -472,14 +561,19 @@
       });
     }
 
-    // 머리말 자리: 진행 중에는 소개, 끝나면 결론
+    // 머리말 자리: 진행 중에는 소개, 끝나면 결론 (점수판에 빛이 한 번 지나간다)
     const sum = $('#summary');
-    sum.classList.toggle('verdict', end);
-    if (end) sum.innerHTML = `<b>결론</b> ${lesson.verdict}`; else sum.textContent = lesson.summary;
+    if (sum.classList.contains('verdict') !== end) {
+      sum.classList.toggle('verdict', end);
+      if (end) sum.innerHTML = `<b>결론</b> ${lesson.verdict}`; else sum.textContent = lesson.summary;
+      $('#score').classList.toggle('finale', end && !state.measuring);
+    } else if (!end) sum.textContent = lesson.summary;
 
     $('#scrub').value = idx;
+    $('#scrub').style.setProperty('--p', `${(idx / Math.max(1, state.total - 1)) * 100}%`);
     $('#count').textContent = `${idx + 1} / ${state.total}`;
-    $('#b-play').textContent = state.playing ? '❚❚ 정지' : end ? '↺ 처음부터' : '▶ 자동 재생';
+    const pb = state.playing ? 'pause' : end ? 'replay' : 'play';
+    if ($('#b-play').dataset.m !== pb) { $('#b-play').dataset.m = pb; $('#b-play').innerHTML = IC[pb] + { pause: '정지', replay: '처음부터', play: '자동 재생' }[pb]; }
     $('#b-prev').disabled = idx === 0;
     $('#b-next').disabled = end;
     if (end && !done.has(lesson.id)) {

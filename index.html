@@ -5,35 +5,41 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CS 보이는 코드 — 한 줄씩 눈으로 배우는 CS</title>
 <meta name="description" content="코드 한 줄이 메모리와 성능을 어떻게 바꾸는지 애니메이션으로 보여주는 CS 학습 사이트">
+<meta name="theme-color" content="#090b10">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 <div id="app">
   <aside id="side">
     <a class="brand" href="#">
-      <span class="logo">▮▯▮</span>
+      <span class="logo"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2" y="10" width="4" height="8" rx="1.5"/><rect x="8" y="2" width="4" height="16" rx="1.5"/><rect x="14" y="6" width="4" height="12" rx="1.5" opacity=".65"/></svg></span>
       <span><b>CS 보이는 코드</b><small>한 줄씩, 눈으로 배우는 CS</small></span>
     </a>
     <p class="intro">코드만 봐서는 감이 안 오는 개념을, 줄 단위 실행 애니메이션과 성능 수치로 보여 줍니다.</p>
-    <a id="symlink" href="#symptoms"><b>증상으로 찾기</b><small>디버깅 중 본 현상 → 원인 개념과 처방</small></a>
+    <div id="prog"><div><span>학습 진도</span><b></b></div><div class="lvbar"><i></i></div></div>
+    <a id="symlink" href="#symptoms"><i data-ic="search"></i><span><b>증상으로 찾기</b><small>디버깅 중 본 현상 → 원인과 처방</small></span></a>
     <nav id="nav"></nav>
-    <button id="theme" type="button">테마 전환</button>
+    <button id="theme" type="button"><i data-ic="theme"></i>밝게 / 어둡게</button>
   </aside>
   <div id="scrim"></div>
   <main id="main">
     <div id="stage">
       <header class="top">
         <div class="top-row">
-          <button id="menu" type="button" aria-label="목차 열기/접기" title="목차 열기/접기">☰</button>
+          <button id="menu" type="button" aria-label="목차 열기/접기" title="목차 열기/접기"><i data-ic="menu"></i></button>
           <div class="headline"><h1 id="title"></h1><span id="level" class="badge"></span><span id="pos"></span></div>
           <div class="top-ctl">
-            <button id="tip" type="button" hidden>그림이 작다면 목차 접기 ☰</button>
+            <button id="tip" type="button" hidden>그림이 작다면 목차 접기</button>
             <div id="viewmode" class="seg" role="group" aria-label="보기 방식" hidden>
               <button type="button" data-m="side" title="두 방식을 한 화면에 나란히">나란히</button>
               <button type="button" data-m="focus" title="한 방식씩 크게">하나씩</button>
             </div>
             <label id="param" hidden><span></span><select></select></label>
-            <a id="tolearn" href="#learn">정리 · 증상 ↓</a>
+            <a id="tolearn" href="#learn">정리 · 증상<i data-ic="down"></i></a>
           </div>
         </div>
         <p id="summary"></p>
@@ -49,10 +55,10 @@
   <footer id="player">
     <span id="tbar"></span>
     <div class="pl-btns">
-      <button id="b-reset" type="button" title="처음으로 (Home)" aria-label="처음으로">⏮</button>
-      <button id="b-prev" type="button" title="이전 단계 (←)">◀ 이전</button>
-      <button id="b-play" type="button" class="primary" title="자동 재생/정지 (Space)">▶ 자동 재생</button>
-      <button id="b-next" type="button" title="다음 단계 (→)">다음 ▶</button>
+      <button id="b-reset" type="button" title="처음으로 (Home)" aria-label="처음으로"><i data-ic="first"></i></button>
+      <button id="b-prev" type="button" title="이전 단계 (←)"><i data-ic="prev"></i>이전</button>
+      <button id="b-play" type="button" class="primary" title="자동 재생/정지 (Space)"></button>
+      <button id="b-next" type="button" title="다음 단계 (→)">다음<i data-ic="next"></i></button>
     </div>
     <input id="scrub" type="range" min="0" max="0" value="0" aria-label="실행 단계">
     <span id="count">0 / 0</span>
@@ -62,7 +68,7 @@
         <option value="1.5">조금 빠르게</option><option value="2.5">빠르게</option><option value="6">훑어보기</option>
       </select>
     </label>
-    <span class="keys">Space 재생 · ← → 한 단계</span>
+    <span class="keys"><kbd>Space</kbd> 재생 <kbd>←</kbd><kbd>→</kbd> 한 단계</span>
   </footer>
 </div>
 <script src="js/engine.js"></script>

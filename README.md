@@ -13,6 +13,8 @@ npx serve .        # 또는 python3 -m http.server
 
 정적 파일뿐이라 GitHub Pages 같은 정적 호스팅에 그대로 올릴 수 있습니다.
 
+글꼴은 Pretendard(jsDelivr)와 JetBrains Mono(Google Fonts)를 불러옵니다. 불러오지 못하면 시스템 글꼴로 표시됩니다.
+
 ## 두 가지 사용법
 
 **1. 개념부터 배우기** — 왼쪽 목차에서 기초 → 시니어 순서로 레슨을 따라갑니다.
