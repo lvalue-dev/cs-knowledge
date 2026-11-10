@@ -163,7 +163,8 @@
         r.setAttribute('x', -hw); r.setAttribute('y', -hh); r.setAttribute('width', hw * 2); r.setAttribute('height', hh * 2);
         r.setAttribute('rx', n.round ? hh : 6);
         t.textContent = n.v; t.setAttribute('y', 4);
-        sub.textContent = n.sub || ''; sub.setAttribute('y', hh + 12); sub.setAttribute('class', 'nsub');
+        sub.textContent = n.sub || ''; sub.setAttribute('class', 'nsub' + (n.side ? ' side' : ''));
+        sub.setAttribute('x', n.side ? hw + 4 : 0); sub.setAttribute('y', n.side ? 3 : hh + 12);
       }, false);
     },
   };
@@ -197,14 +198,71 @@
   }
   function markNav() {
     for (const a of document.querySelectorAll('#nav a')) {
-      a.classList.toggle('cur', state.lesson && a.dataset.id === state.lesson.id);
+      a.classList.toggle('cur', !!state.lesson && a.dataset.id === state.lesson.id);
       a.classList.toggle('done', done.has(a.dataset.id));
     }
+    $('#symlink').classList.toggle('cur', !state.lesson);
+    const cur = $('#nav a.cur');
+    if (cur) cur.scrollIntoView({ block: 'nearest' });
+  }
+
+  const CATS = [['slow', '느려진다'], ['hang', '멈춘다 · 타임아웃'], ['memory', '메모리가 늘어난다'], ['wrong', '값이 틀리다'], ['flaky', '가끔만 발생한다'], ['data', '데이터 중복 · 유실'], ['crash', '에러로 죽는다']];
+  const lessonLink = (id) => { const l = CS.lessons.find((x) => x.id === id); return l ? `<a class="chip" href="#${id}">${esc(l.title)}</a>` : ''; };
+
+  // 증상 사전: 디버깅 중 관찰한 현상 → 의심할 CS 개념 → 확인 방법 → 처방
+  function loadSymptoms() {
+    pause();
+    state.lesson = null;
+    document.body.classList.add('sym');
+    document.body.classList.remove('nav-open');
+    $('#level').textContent = '진단';
+    $('#level').className = 'badge';
+    $('#pos').textContent = `${Object.keys(CS.diagnose).length}개 항목`;
+    $('#title').textContent = '증상으로 찾기';
+    $('#summary').textContent = '디버깅하다 본 현상에서 출발합니다. 어떤 CS 개념의 문제인지, 무엇을 재 보면 확신할 수 있는지, 어느 방향으로 고쳐야 하는지를 정리했습니다.';
+    document.title = '증상으로 찾기 — CS 보이는 코드';
+    $('#param').hidden = true;
+    const view = $('#symview');
+    view.hidden = false;
+    view.innerHTML = `
+      <div class="box steps"><h3>원인을 좁히는 순서</h3><ol>${CS.method.map((m) => `<li><b>${m[0]}</b> ${m[1]}</li>`).join('')}</ol></div>
+      <div class="box"><h3>1차 분류: 관찰한 것으로 영역 좁히기</h3>
+        <div class="tri">${CS.triage.map((t) => `<div class="tri-row"><div><b>${t.see}</b></div><div>${t.suspect}</div><div class="chips">${t.lessons.map(lessonLink).join('')}</div></div>`).join('')}</div></div>
+      <div class="symbar"><input id="symq" type="search" placeholder="현상을 검색해 보세요 (예: 타임아웃, 메모리, 중복, 느려)" aria-label="증상 검색">
+        <div class="chips" id="symcats"><button type="button" class="chip on" data-c="">전체</button>${CATS.map(([k, n]) => `<button type="button" class="chip" data-c="${k}">${n}</button>`).join('')}</div></div>
+      <div id="symlist"></div>`;
+    let cat = '';
+    const draw = () => {
+      const q = $('#symq').value.trim().toLowerCase();
+      const rows = CS.lessons.filter((l) => CS.diagnose[l.id]).map((l) => [l, CS.diagnose[l.id]]).filter(([l, d]) =>
+        (!cat || d.cat.includes(cat)) && (!q || [l.title, d.concept, d.check, d.fix, ...d.symptoms].join(' ').toLowerCase().includes(q)));
+      $('#symlist').innerHTML = rows.map(([l, d]) => `
+        <article class="sym-card">
+          <header><div class="chips">${d.cat.map((c) => `<span class="tag">${CATS.find((x) => x[0] === c)[1]}</span>`).join('')}</div><span class="badge ${l.level}">${LEVELS.find((x) => x[0] === l.level)[1]}</span></header>
+          <ul class="sx">${d.symptoms.map((x) => `<li>${x}</li>`).join('')}</ul>
+          <dl><dt>의심할 개념</dt><dd><b>${d.concept}</b></dd><dt>확인 방법</dt><dd>${d.check}</dd><dt>고치는 방향</dt><dd>${d.fix}</dd></dl>
+          <a class="go" href="#${l.id}">애니메이션으로 보기: ${esc(l.title)} →</a>
+        </article>`).join('') || '<p class="none">일치하는 항목이 없습니다. 다른 단어로 검색해 보세요.</p>';
+    };
+    $('#symq').oninput = draw;
+    $('#symcats').onclick = (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      cat = b.dataset.c;
+      for (const x of $('#symcats').children) x.classList.toggle('on', x === b);
+      draw();
+    };
+    draw();
+    markNav();
+    scrollTo(0, 0);
   }
 
   function load(id) {
+    if (id === 'symptoms') return loadSymptoms();
     const lesson = CS.lessons.find((l) => l.id === id) || CS.lessons[0];
     pause();
+    document.body.classList.remove('sym');
+    $('#symview').hidden = true;
     state.lesson = lesson;
     state.n = lesson.param ? lesson.param.value : null;
     const lv = LEVELS.find((l) => l[0] === lesson.level);
@@ -223,7 +281,10 @@
       pm.lastChild.innerHTML = lesson.param.options.map((o) => `<option${o === state.n ? ' selected' : ''}>${o}</option>`).join('');
     }
 
+    const dg = CS.diagnose[lesson.id];
     $('#learn').innerHTML = `
+      ${dg ? `<div class="box dx"><h3>이런 현상을 봤다면 이 개념입니다</h3><ul class="sx">${dg.symptoms.map((x) => `<li>${x}</li>`).join('')}</ul>
+        <dl><dt>확인 방법</dt><dd>${dg.check}</dd><dt>고치는 방향</dt><dd>${dg.fix}</dd></dl><a class="go" href="#symptoms">다른 증상 찾아보기 →</a></div>` : ''}
       <div class="box"><h3>핵심 정리</h3><ul>${lesson.points.map((p) => `<li>${p}</li>`).join('')}</ul></div>
       <div class="box senior"><h3>시니어의 시선</h3><p>${lesson.senior}</p></div>
       ${lesson.variants.some((v) => v.big) ? `<div class="box"><h3>복잡도 비교</h3><table><tr><th>방식</th><th>시간</th><th>공간</th></tr>${lesson.variants.map((v) =>
@@ -257,7 +318,7 @@
       const card = document.createElement('article');
       card.className = 'card ' + (r.v.tone || 'info');
       card.innerHTML = `
-        <header><span class="tone">${TONE[r.v.tone || 'info']}</span><h2>${esc(r.v.name)}</h2><span class="status"></span></header>
+        <header><span class="tone">${esc(r.v.label || TONE[r.v.tone || 'info'])}</span><h2>${esc(r.v.name)}</h2><span class="status"></span></header>
         <div class="code">${r.v.code.split('\n').map((line, i) =>
           `<div class="ln" data-l="${i + 1}"><span class="heat"></span><span class="no">${i + 1}</span><code>${hl(line) || ' '}</code>${
             r.v.notes && r.v.notes[i + 1] ? `<span class="note">${esc(r.v.notes[i + 1])}</span>` : ''}<span class="hits"></span></div>`).join('')}</div>
@@ -366,17 +427,19 @@
     store.set('cs-theme', next);
   };
   addEventListener('keydown', (e) => {
+    if (!state.lesson) return;
     if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName) && e.target.type !== 'range') return;
     if (e.key === ' ') { e.preventDefault(); toggle(); }
     else if (e.key === 'ArrowRight') { e.preventDefault(); pause(); go(state.idx + 1); }
     else if (e.key === 'ArrowLeft') { e.preventDefault(); pause(); go(state.idx - 1); }
-    else if (e.key === 'Home') { pause(); go(0); }
-    else if (e.key === 'End') { pause(); go(state.total - 1); }
+    else if (e.key === 'Home') { e.preventDefault(); pause(); go(0); }
+    else if (e.key === 'End') { e.preventDefault(); pause(); go(state.total - 1); }
   });
   addEventListener('hashchange', () => load(location.hash.slice(1)));
 
   const theme = store.get('cs-theme');
   if (theme) document.documentElement.dataset.theme = theme;
+  CS.lessons.sort((a, b) => LEVELS.findIndex((l) => l[0] === a.level) - LEVELS.findIndex((l) => l[0] === b.level));
   buildNav();
   load(location.hash.slice(1));
 })();
