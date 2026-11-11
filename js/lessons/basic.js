@@ -2,46 +2,59 @@
 (function () {
   const CS = window.CS;
 
-  /* ---------- 1. 선형 탐색 vs 이진 탐색 ---------- */
-  const sorted = (n) => Array.from({ length: n }, (_, i) => i * 3 + 2);
+  /* ---------- 1. 선형 탐색 vs 이진 탐색 (비유: 업다운 게임) ---------- */
+  const cards = (n) => Array.from({ length: n }, (_, i) => i + 1);
   CS.add({
     id: 'search', level: 'basic',
-    title: '선형 탐색 vs 이진 탐색',
-    summary: '같은 배열에서 같은 값을 찾는데, 한쪽은 하나씩 다 보고 다른 쪽은 매번 절반을 버립니다. n을 키워 보면 차이가 어떻게 벌어지는지 보입니다.',
-    param: { label: '배열 크기 n', options: [16, 32, 64], value: 32 },
-    headline: '비교 횟수',
-    verdict: 'n이 2배가 되면 선형 탐색의 비교는 2배가 되지만, 이진 탐색은 딱 1번 늘어납니다. 이것이 O(n)과 O(log n)의 차이입니다.',
+    title: '선형 탐색 vs 이진 탐색: 업다운 게임',
+    summary: '친구가 1부터 n까지 중에 숫자 하나를 골랐습니다. 숫자를 부르면 친구는 "정답", "업", "다운" 중 하나로만 답합니다. 1부터 차례로 부르는 사람과 가운데부터 부르는 사람, 누가 먼저 맞힐까요?',
+    param: { label: '숫자 범위 1 ~ n', options: [16, 32, 64], value: 32 },
+    headline: '질문 횟수 (비교)',
+    verdict: '범위가 2배가 되면 차례로 부르는 사람의 질문은 2배가 되지만, 가운데부터 부르는 사람은 딱 1번 늘어납니다. "업/다운" 한마디가 남은 후보의 절반을 지워 주기 때문입니다. 이것이 O(n)과 O(log n)의 차이입니다.',
+    story: {
+      scene: '업다운 게임에서 이기는 사람은 항상 가운데 숫자를 부릅니다. 이진 탐색은 그 전략을 코드로 옮긴 것입니다.',
+      map: [
+        ['1 ~ n이 순서대로 놓인 숫자 카드', '정렬된 배열 <code>arr</code>'],
+        ['친구가 고른 숫자', '찾는 값 <code>target</code>'],
+        ['아직 정답일 수 있는 범위', '탐색 구간 <code>lo ~ hi</code>'],
+        ['가운데 숫자를 부른다', '<code>mid = (lo + hi) &gt;&gt; 1</code>'],
+        ['"업!" (더 큰 수야)', '<code>arr[mid] &lt; target</code> → <code>lo = mid + 1</code>'],
+        ['"다운!" (더 작은 수야)', '<code>arr[mid] &gt; target</code> → <code>hi = mid - 1</code>'],
+        ['질문 한 번', '비교 한 번'],
+      ],
+      limit: '게임의 숫자는 1부터 빈틈없이 이어지지만, 실제 배열은 값이 띄엄띄엄 있어도 됩니다. 필요한 것은 <b>정렬되어 있다</b>는 사실 하나입니다. 반대로 카드가 뒤섞여 있으면 "업/다운" 힌트가 의미가 없어져 이진 탐색을 쓸 수 없고, 그때는 하나씩 확인하는 선형 탐색뿐입니다.',
+    },
     variants: [
       {
-        name: '선형 탐색', tone: 'bad', big: { time: 'O(n)', space: 'O(1)' },
+        name: '1부터 차례로 부르기 (선형 탐색)', tone: 'bad', big: { time: 'O(n)', space: 'O(1)' },
         code: `function find(arr, target) {
   for (let i = 0; i < arr.length; i++) {
     if (arr[i] === target) return i;
   }
   return -1;
 }`,
-        notes: { 2: '최대 n번 반복' },
+        notes: { 2: '최대 n번 반복', 3: '"이 숫자야?" 한 번' },
         run(t, n) {
-          const a = sorted(n), target = a[n - 3];
-          t.m['비교 횟수'] = 0;
+          const a = cards(n), target = a[n - 3];
+          t.m['질문 횟수 (비교)'] = 0;
           const snap = (i, found) => [{
-            type: 'cells', title: `arr (n = ${n}) · target = ${target}`,
+            type: 'cells', title: `숫자 카드 1 ~ ${n} · 친구가 고른 숫자는 비밀 (사실은 ${target})`,
             items: a.map((v, k) => ({ id: k, v, s: k === i ? (found ? 'done' : 'active') : k < i ? 'dim' : '', ptr: k === i ? 'i' : '' })),
           }];
-          t.step(1, `정렬된 배열에서 <b>${target}</b>을 찾습니다. 앞에서부터 하나씩 확인합니다.`, snap(-1));
+          t.step(1, `친구가 1 ~ ${n} 중 하나를 골랐습니다. 작전: <b>1부터 차례로</b> 물어봅니다.`, snap(-1));
           for (let i = 0; i < n; i++) {
-            t.step(2, `<code>i = ${i}</code> — 아직 배열 끝이 아니므로 계속합니다.`, snap(i));
-            t.m['비교 횟수']++;
+            t.step(2, `다음 카드로 넘어갑니다. <code>i = ${i}</code>`, snap(i));
+            t.m['질문 횟수 (비교)']++;
             if (a[i] === target) {
-              t.step(3, `<code>arr[${i}]</code> = ${a[i]} — 찾았습니다! 여기까지 <b>${i + 1}번</b> 비교했습니다.`, snap(i, true));
+              t.step(3, `"${a[i]}이야?" → <b>"정답!"</b> 맞히긴 했지만 <b>${i + 1}번</b>이나 물어봤습니다.`, snap(i, true));
               return;
             }
-            t.step(3, `<code>arr[${i}]</code> = ${a[i]} ≠ ${target}. 이 칸 하나만 후보에서 제외됩니다.`, snap(i));
+            t.step(3, `"${a[i]}이야?" → "아니." 질문 한 번에 후보가 <b>딱 하나</b> 줄었습니다.`, snap(i));
           }
         },
       },
       {
-        name: '이진 탐색', tone: 'good', big: { time: 'O(log n)', space: 'O(1)' },
+        name: '가운데부터 부르기 (이진 탐색)', tone: 'good', big: { time: 'O(log n)', space: 'O(1)' },
         code: `function find(arr, target) {
   let lo = 0, hi = arr.length - 1;
   while (lo <= hi) {
@@ -52,36 +65,36 @@
   }
   return -1;
 }`,
-        notes: { 3: '최대 log₂n번 반복', 6: '왼쪽 절반 버림', 7: '오른쪽 절반 버림' },
+        notes: { 3: '최대 log₂n번 반복', 6: '"업!" → 아래 절반 버림', 7: '"다운!" → 위 절반 버림' },
         run(t, n) {
-          const a = sorted(n), target = a[n - 3];
-          t.m['비교 횟수'] = 0;
+          const a = cards(n), target = a[n - 3];
+          t.m['질문 횟수 (비교)'] = 0;
           let lo = 0, hi = n - 1;
           const snap = (mid, found) => [{
-            type: 'cells', title: `arr (n = ${n}) · target = ${target} · 남은 후보 ${Math.max(0, hi - lo + 1)}칸`,
+            type: 'cells', title: `숫자 카드 1 ~ ${n} · 아직 정답일 수 있는 카드 ${Math.max(0, hi - lo + 1)}장`,
             items: a.map((v, k) => ({
               id: k, v,
               s: k === mid ? (found ? 'done' : 'active') : k < lo || k > hi ? 'dim' : 'cmp',
               ptr: [k === lo && 'lo', k === mid && 'mid', k === hi && 'hi'].filter(Boolean).join('·'),
             })),
           }];
-          t.step(2, `탐색 범위를 배열 전체(<code>lo = 0, hi = ${hi}</code>)로 잡습니다. 정렬되어 있다는 사실을 이용합니다.`, snap(-1));
+          t.step(2, `같은 게임입니다. 작전: 남은 범위(<code>lo</code> ~ <code>hi</code>)의 <b>가운데</b>를 부릅니다. 처음에는 1 ~ ${n} 전체가 후보입니다.`, snap(-1));
           while (lo <= hi) {
             const mid = (lo + hi) >> 1;
-            t.step(4, `가운데 칸 <code>mid = ${mid}</code>를 고릅니다.`, snap(mid));
-            t.m['비교 횟수']++;
+            t.step(4, `남은 후보 ${a[lo]} ~ ${a[hi]}의 가운데는 <b>${a[mid]}</b>입니다.`, snap(mid));
+            t.m['질문 횟수 (비교)']++;
             if (a[mid] === target) {
-              t.step(5, `<code>arr[${mid}]</code> = ${a[mid]} — 찾았습니다! 단 <b>${t.m['비교 횟수']}번</b> 만에 끝났습니다.`, snap(mid, true));
+              t.step(5, `"${a[mid]}이야?" → <b>"정답!"</b> 단 <b>${t.m['질문 횟수 (비교)']}번</b> 만에 맞혔습니다.`, snap(mid, true));
               return;
             }
             if (a[mid] < target) {
               const cut = mid - lo + 1;
               lo = mid + 1;
-              t.step(6, `${a[mid]} &lt; ${target} → 왼쪽 <b>${cut}칸을 한 번에</b> 버립니다.`, snap(mid));
+              t.step(6, `"${a[mid]}이야?" → <b>"업!"</b> ${a[mid]} 이하 <b>${cut}장을 한 번에</b> 버립니다.`, snap(mid));
             } else {
               const cut = hi - mid + 1;
               hi = mid - 1;
-              t.step(7, `${a[mid]} &gt; ${target} → 오른쪽 <b>${cut}칸을 한 번에</b> 버립니다.`, snap(mid));
+              t.step(7, `"${a[mid]}이야?" → <b>"다운!"</b> ${a[mid]} 이상 <b>${cut}장을 한 번에</b> 버립니다.`, snap(mid));
             }
           }
         },
@@ -89,8 +102,8 @@
     ],
     points: [
       '코드 왼쪽의 붉은 막대와 <code>×N</code>은 그 줄이 실행된 횟수입니다. 느린 코드는 특정 줄이 뜨겁게 달아오릅니다.',
-      '이진 탐색은 <b>정렬된 데이터</b>에서만 쓸 수 있습니다. 정렬이라는 사전 비용을 내고 조회를 싸게 만드는 거래입니다.',
-      '100만 건이면 선형은 최대 100만 번, 이진은 최대 20번 비교합니다.',
+      '가운데부터 부르는 작전은 <b>정렬된 데이터</b>에서만 통합니다. 정렬이라는 사전 비용을 내고 조회를 싸게 만드는 거래입니다.',
+      '1 ~ 100만 게임이라면 차례로 부르면 최대 100만 번, 가운데부터 부르면 최대 20번입니다.',
     ],
     senior: 'DB 인덱스, <code>git bisect</code>, 장애 원인 배포 찾기까지 전부 같은 원리입니다. "후보를 매번 절반으로 줄일 수 있는가?"를 묻는 습관이 생기면 문제를 보는 눈이 달라집니다.',
   });

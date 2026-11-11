@@ -395,6 +395,9 @@ dd code, .sx code, .tri code { background: var(--panel3); padding: 1px 5px; bord
 .box.iv { --c: var(--new); grid-column: 1 / -1; display: grid; gap: 8px; }
 .box.iv h3 { margin: 0 0 2px; }
 .box.ct { --c: var(--cmp); grid-column: 1 / -1; }
+.box.story { --c: var(--brand); grid-column: 1 / -1; }
+.box.story table { margin-top: 10px; }
+.box.story td:first-child { width: 42%; font-weight: 600; }
 .qa { border: 1px solid var(--line); border-radius: 12px; background: var(--panel2); transition: border-color .25s, background .25s, box-shadow .3s; }
 .qa[open] { border-color: var(--line2); }
 .qa.known { border-color: color-mix(in srgb, var(--done) 35%, var(--line)); }
@@ -461,10 +464,6 @@ dd code, .sx code, .tri code { background: var(--panel3); padding: 1px 5px; bord
 #keys-pop h4 { margin: 0 0 10px; font-size: 13px; }
 #keys-pop dl { gap: 8px 14px; font-size: 13px; align-items: center; }
 #keys-pop dt { padding: 0; }
-#coach { position: absolute; left: 50%; bottom: calc(100% - 2px); transform: translateX(-50%); pointer-events: none; padding: 6px 14px; border-radius: 99px; background: var(--text); color: var(--bg); font-size: 12.5px; white-space: nowrap; box-shadow: 0 10px 26px -10px rgba(0, 0, 0, .6); animation: bob 1.8s ease-in-out infinite; }
-#coach[hidden] { display: none; }
-#coach .m { display: none; }
-#coach kbd { border-color: color-mix(in srgb, var(--bg) 30%, transparent); background: none; color: inherit; }
 kbd { display: inline-block; min-width: 20px; padding: 1px 6px; border: 1px solid var(--line2); border-bottom-width: 2px; border-radius: 6px; background: var(--panel2); font: 11px var(--mono); color: var(--muted); text-align: center; }
 /* 독이 좁아지면 속도는 누를 때마다 바뀌는 버튼 하나로, 더 좁으면 글자 대신 아이콘만 */
 @container (max-width: 860px) {
@@ -482,7 +481,6 @@ kbd { display: inline-block; min-width: 20px; padding: 1px 6px; border: 1px soli
 /* ---------- 움직임 ---------- */
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } }
 @keyframes fadein { from { opacity: 0; } }
-@keyframes bob { 50% { transform: translate(-50%, -4px); } }
 @keyframes pop { 0% { transform: scale(.5); opacity: 0; } 60% { opacity: 1; } }
 @keyframes drop { from { opacity: 0; transform: translate(-50%, -6px); } }
 @keyframes bump { 40% { transform: scale(1.35); color: var(--bad); } }
@@ -541,8 +539,7 @@ kbd { display: inline-block; min-width: 20px; padding: 1px 6px; border: 1px soli
   .pl-track { order: -1; flex-basis: 100%; }
   .pl-btns { flex: 1; }
   .dock button.primary { flex: 1; min-width: 0; height: 42px; }
-  #keys-pop, #coach .d { display: none; }
-  #coach .m { display: inline; }
+  #keys-pop { display: none; }
   #learn { grid-template-columns: minmax(0, 1fr); }
   .box, .sym-card { padding: 15px 16px; }
   #pager { flex-direction: column; }

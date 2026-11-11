@@ -476,6 +476,9 @@
     $('#learn').innerHTML = `
       ${dg ? `<div class="box dx"><h3>이런 현상을 봤다면 이 개념입니다</h3><ul class="sx">${dg.symptoms.map((x) => `<li>${x}</li>`).join('')}</ul>
         <dl><dt>확인 방법</dt><dd>${dg.check}</dd><dt>고치는 방향</dt><dd>${dg.fix}</dd></dl><a class="go" href="#symptoms">다른 증상 찾아보기 →</a></div>` : ''}
+      ${lesson.story ? `<div class="box story"><h3>비유로 다시 보기</h3><p>${lesson.story.scene}</p>
+        <table><tr><th>이야기 속에서는</th><th>실제 용어로는</th></tr>${lesson.story.map.map(([a, b]) => `<tr><td>${a}</td><td>${b}</td></tr>`).join('')}</table>
+        <p class="fineprint"><b>비유가 맞지 않는 부분</b> — ${lesson.story.limit}</p></div>` : ''}
       ${ct ? `<div class="box ct"><h3>코딩 테스트에서</h3><dl><dt>이런 문제면</dt><dd><b>${ct.signal}</b></dd><dt>접근</dt><dd>${ct.how} <code>${ct.big}</code></dd><dt>자주 틀리는 곳</dt><dd>${ct.trap}</dd></dl></div>` : ''}
       ${qa ? `<div class="box iv"><h3>면접 질문 — 답을 가린 채 먼저 말해 보세요</h3>${qaHTML(lesson.id)}<a class="go" href="#prep">질문 은행 전체 보기 →</a></div>` : ''}
       <div class="box"><h3>핵심 정리</h3><ul>${lesson.points.map((p) => `<li>${p}</li>`).join('')}</ul></div>
@@ -744,12 +747,7 @@
     tbar.style.width = '100%';
   }
   const readTime = () => state.delays[state.idx] / state.speed;
-  // 처음 온 사람에게 조작법을 한 번 알려 주고, 무엇이든 눌러 보면 사라진다
-  const coach = $('#coach');
-  coach.hidden = !!store.get('cs-coach');
-  const dismissCoach = () => { if (!coach.hidden) { coach.hidden = true; store.set('cs-coach', 1); } };
   function go(i) {
-    dismissCoach();
     state.idx = Math.max(0, Math.min(state.total - 1, i));
     render();
   }
@@ -763,7 +761,6 @@
     }, ms);
   }
   function play() {
-    dismissCoach();
     if (state.idx >= state.total - 1) state.idx = 0;
     state.playing = true;
     render();

@@ -2,48 +2,60 @@
 (function () {
   const CS = window.CS;
 
-  /* ---------- 힙(우선순위 큐) ---------- */
+  /* ---------- 힙(우선순위 큐) (비유: 응급실 접수) ---------- */
   const POPS = 3;
   CS.add({
     id: 'heap', level: 'mid',
-    title: '힙(우선순위 큐): 가장 급한 것부터 꺼내기',
-    summary: '작업 큐, 타이머, 스케줄러는 "남은 것 중 가장 작은 값"을 계속 꺼냅니다. 배열을 매번 훑으면 꺼낼 때마다 전부를 봐야 하지만, 힙은 트리의 한 줄기만 내려갑니다.',
-    param: { label: '대기 중인 작업 수 n', options: [7, 15, 31], value: 15 },
+    title: '힙(우선순위 큐): 응급실은 온 순서대로 부르지 않는다',
+    summary: '응급실에 환자들이 기다립니다. 숫자는 위급 순위로, 1번이 가장 위급합니다. 의사는 매번 "지금 가장 위급한 환자"를 불러야 합니다. 대기실을 전부 훑어 찾는 방법과, 접수대가 미리 줄을 세워 두는 방법을 비교합니다.',
+    param: { label: '대기 환자 수 n', options: [7, 15, 31], value: 15 },
     headline: '비교 횟수',
-    verdict: '배열은 꺼낼 때마다 n번, 힙은 트리 높이인 log n 수준만 비교합니다. n이 100만이면 한 번 꺼내는 데 100만 번 대 약 40번입니다.',
+    verdict: '대기실을 훑으면 부를 때마다 환자 n명을 전부 확인해야 합니다. 힙으로 줄을 세워 두면 가장 위급한 환자는 항상 맨 위에 있고, 한 명을 부른 뒤 줄을 고치는 데는 트리 높이(log n)만큼만 비교합니다. 대기 환자가 100만 명이어도 약 40번입니다.',
+    story: {
+      scene: '응급실, 놀이공원 패스트트랙, 게임 매칭 대기열처럼 "먼저 온 순서"가 아니라 "더 급한 순서"로 꺼내야 하는 줄이 우선순위 큐입니다. 힙은 그 줄을 싸게 유지하는 방법입니다.',
+      map: [
+        ['대기 환자', '원소'],
+        ['위급 순위 (작을수록 위급)', '우선순위 키 — 여기서는 최소 힙'],
+        ['의사가 다음 환자를 부른다', '<code>pop</code> — 최솟값 꺼내기'],
+        ['대기표 맨 위의 환자', '루트 <code>heap[0]</code>'],
+        ['빈 맨 윗자리에 맨 끝 환자를 올리고, 제자리로 내려보낸다', 'sift-down'],
+        ['새 환자가 접수한다', '<code>push</code> — 끝에 넣고 위로 올리기 (sift-up)'],
+      ],
+      limit: '실제 응급실은 위급도가 같으면 먼저 온 환자를 부르지만, 힙은 값이 같은 원소끼리의 순서를 보장하지 않습니다. 필요하면 (위급도, 접수 번호)를 함께 키로 씁니다. 또 힙은 "가장 위급한 한 명"만 바로 알려 줍니다. 두 번째로 위급한 환자가 누구인지는 한 명을 꺼내 봐야 압니다.',
+    },
     variants: [
       {
-        name: '배열에서 최솟값 찾기', tone: 'bad', big: { time: 'pop O(n)', space: 'O(1)' },
-        code: `function popMin(jobs) {
+        name: '대기실 전체를 훑어 찾기 (배열)', tone: 'bad', big: { time: 'pop O(n)', space: 'O(1)' },
+        code: `function popMin(patients) {
   let best = 0;
-  for (let i = 1; i < jobs.length; i++) {
-    if (jobs[i] < jobs[best]) best = i;
+  for (let i = 1; i < patients.length; i++) {
+    if (patients[i] < patients[best]) best = i;
   }
-  return jobs.splice(best, 1)[0];
+  return patients.splice(best, 1)[0];
 }`,
-        notes: { 4: '남은 작업 전부와 비교', 6: '뒤 원소를 당겨 채움' },
+        notes: { 4: '대기 환자 전부와 비교', 6: '빈자리를 당겨 채움' },
         run(t, n) {
           const a = CS.perm(n, 9), out = [];
           t.m['비교 횟수'] = 0;
           const snap = (i, best) => [
-            { type: 'cells', title: `jobs — 숫자가 작을수록 급한 작업 (${a.length}개 대기)`, items: a.map((v, k) => ({ id: v, v, s: k === best ? 'active' : k === i ? 'cmp' : k < i ? 'dim' : '', ptr: k === best ? 'best' : '' })) },
-            { type: 'cells', title: '꺼낸 순서', items: out.map((v) => ({ id: v, v, s: 'done' })) },
+            { type: 'cells', title: `대기실 — 숫자가 작을수록 위급 (${a.length}명 대기)`, items: a.map((v, k) => ({ id: v, v, s: k === best ? 'active' : k === i ? 'cmp' : k < i ? 'dim' : '', ptr: k === best ? 'best' : '' })) },
+            { type: 'cells', title: '진료실로 부른 순서', items: out.map((v) => ({ id: v, v, s: 'done' })) },
           ];
           for (let p = 0; p < POPS; p++) {
             let best = 0;
-            t.step(2, `${p + 1}번째 꺼내기 — 어느 것이 가장 작은지 모르므로 처음부터 훑습니다.`, snap(0, 0));
+            t.step(2, `"다음 환자 들어오세요" (${p + 1}번째) — 누가 가장 위급한지 모릅니다. 대기실 첫 자리부터 훑습니다.`, snap(0, 0));
             for (let i = 1; i < a.length; i++) {
               t.m['비교 횟수']++;
               if (a[i] < a[best]) best = i;
-              t.step(4, `${a[i]}와 비교 — 지금까지 최솟값은 <b>${a[best]}</b>.`, snap(i, best));
+              t.step(4, `위급 순위 ${a[i]}번 환자를 확인 — 지금까지 가장 위급한 환자는 <b>${a[best]}번</b>.`, snap(i, best));
             }
             out.push(a.splice(best, 1)[0]);
-            t.step(6, `<b>${out[out.length - 1]}</b>을 꺼냈습니다. 다음에 꺼낼 때는 또 처음부터 전부 봐야 합니다.`, snap(-1, -1));
+            t.step(6, `<b>${out[out.length - 1]}번 환자</b>가 진료실로 들어갑니다. 다음 환자를 부를 때는 또 대기실 전체를 훑어야 합니다.`, snap(-1, -1));
           }
         },
       },
       {
-        name: '최소 힙', tone: 'good', big: { time: 'pop O(log n)', space: 'O(1)' },
+        name: '접수대가 줄 세워 두기 (최소 힙)', tone: 'good', big: { time: 'pop O(log n)', space: 'O(1)' },
         code: `function popMin(heap) {
   const top = heap[0], last = heap.pop();
   if (heap.length) heap[0] = last;
@@ -56,7 +68,7 @@
   }
   return top;
 }`,
-        notes: { 2: '최솟값은 항상 루트', 5: '트리 높이만큼만 반복' },
+        notes: { 2: '가장 위급한 환자는 항상 맨 위', 5: '트리 높이만큼만 반복' },
         run(t, n) {
           const h = CS.perm(n, 9), out = [];
           const less = (i, j) => h[i] < h[j];
@@ -68,44 +80,44 @@
           const pos = (k) => { const d = Math.floor(Math.log2(k + 1)), j = k + 1 - 2 ** d; return { x: ((j + 0.5) / 2 ** d) * W, y: d * 46 + 22 }; };
           const snap = (hot = {}) => [
             {
-              type: 'graph', w: W, h: depth * 46 + 48, scale: 1.4, title: `최소 힙 — 부모는 항상 자식보다 작다 (${h.length}개 대기)`,
+              type: 'graph', w: W, h: depth * 46 + 48, scale: 1.4, title: `접수대의 대기표 — 위쪽 환자가 바로 아래 환자보다 항상 더 위급 (${h.length}명 대기)`,
               nodes: h.map((v, k) => ({ id: v, v, ...pos(k), round: true, s: hot[k] || '' })),
               edges: h.map((v, k) => (k ? { a: h[(k - 1) >> 1], b: v, s: hot[k] && hot[(k - 1) >> 1] ? 'active' : '' } : null)).filter(Boolean),
             },
-            { type: 'cells', title: '꺼낸 순서', items: out.map((v) => ({ id: v, v, s: 'done' })) },
+            { type: 'cells', title: '진료실로 부른 순서', items: out.map((v) => ({ id: v, v, s: 'done' })) },
           ];
           for (let p = 0; p < POPS; p++) {
-            t.step(2, `${p + 1}번째 꺼내기 — 최솟값은 찾을 필요 없이 <b>루트(${h[0]})</b>입니다.`, snap({ 0: 'done' }));
+            t.step(2, `"다음 환자 들어오세요" (${p + 1}번째) — 찾을 필요가 없습니다. 가장 위급한 환자는 <b>맨 위(${h[0]}번)</b>입니다.`, snap({ 0: 'done' }));
             out.push(h[0]);
             const last = h.pop();
             if (h.length) h[0] = last;
-            t.step(3, `빈 루트에 맨 끝 원소 <b>${last}</b>를 올립니다. 이제 제자리를 찾아 내려보냅니다.`, snap({ 0: 'active' }));
+            t.step(3, `빈 맨 윗자리에 대기표 맨 끝의 <b>${last}번 환자</b>를 임시로 올립니다. 덜 위급하니 제자리를 찾아 내려보냅니다.`, snap({ 0: 'active' }));
             let i = 0;
             while (true) {
               let c = 2 * i + 1;
               if (c + 1 < h.length) { t.m['비교 횟수']++; if (h[c + 1] < h[c]) c++; }
-              if (c >= h.length) { t.step(8, `자식이 없습니다. 여기가 제자리입니다.`, snap({ [i]: 'done' })); break; }
+              if (c >= h.length) { t.step(8, `아래에 아무도 없습니다. 여기가 제자리입니다.`, snap({ [i]: 'done' })); break; }
               t.m['비교 횟수']++;
-              if (h[i] <= h[c]) { t.step(8, `${h[i]} ≤ ${h[c]} — 자식보다 작으므로 여기가 제자리입니다.`, snap({ [i]: 'done', [c]: 'cmp' })); break; }
-              t.step(7, `두 자식 중 더 작은 <b>${h[c]}</b>와 비교합니다. ${h[i]} &gt; ${h[c]}이므로 내려가야 합니다.`, snap({ [i]: 'active', [c]: 'cmp' }));
+              if (h[i] <= h[c]) { t.step(8, `${h[i]}번이 아래의 ${h[c]}번보다 위급합니다. 여기가 제자리입니다.`, snap({ [i]: 'done', [c]: 'cmp' })); break; }
+              t.step(7, `바로 아래 두 환자 중 더 위급한 <b>${h[c]}번</b>과 비교합니다. ${h[c]}번이 더 위급하므로 자리를 바꿔야 합니다.`, snap({ [i]: 'active', [c]: 'cmp' }));
               [h[i], h[c]] = [h[c], h[i]];
               i = c;
-              t.step(9, `교환. <b>한 층</b> 내려왔습니다. 반대쪽 가지는 쳐다보지도 않습니다.`, snap({ [i]: 'active' }));
+              t.step(9, `자리 교환. <b>한 층</b> 내려왔습니다. 반대쪽 줄의 환자들은 쳐다보지도 않습니다.`, snap({ [i]: 'active' }));
             }
           }
-          t.step(11, `${POPS}개를 꺼내는 데 비교 <b>${t.m['비교 횟수']}번</b>이면 충분했습니다.`, snap());
+          t.step(11, `환자 ${POPS}명을 부르는 데 비교 <b>${t.m['비교 횟수']}번</b>이면 충분했습니다.`, snap());
         },
       },
     ],
     points: [
-      '힙은 "전체 정렬"을 포기하고 <b>"부모 ≤ 자식"</b>만 유지합니다. 그 덕에 삽입·삭제가 O(log n)입니다.',
+      '힙은 환자 전체를 순서대로 세우지 않습니다. <b>"위쪽이 바로 아래보다 위급하다(부모 ≤ 자식)"</b>만 지킵니다. 그 덕에 삽입·삭제가 O(log n)입니다.',
       '배열 하나로 구현합니다: i의 자식은 <code>2i+1</code>, <code>2i+2</code>. 포인터가 없어 캐시에도 유리합니다.',
       '상위 K개 뽑기, 다익스트라 최단 경로, 타이머·지연 큐, 스트림 병합이 전부 힙입니다.',
     ],
     senior: 'JS에는 내장 우선순위 큐가 없어서 "매번 <code>sort()</code>하고 <code>shift()</code>"하는 코드가 자주 보입니다. 꺼낼 때마다 O(n log n)이라 큐가 길어지면 스케줄러 자체가 병목이 됩니다. 또 "상위 10개"가 필요할 뿐인데 전체를 정렬하는 것도 같은 낭비입니다. 크기 K짜리 힙이면 O(n log K)이고, DB라면 <code>ORDER BY … LIMIT 10</code>에 인덱스가 붙어 있는지 확인하는 것이 먼저입니다.',
   });
 
-  /* ---------- BFS vs DFS ---------- */
+  /* ---------- BFS vs DFS (비유: 미로 게임) ---------- */
   const ROWS = 5, COLS = 7, GOAL = 3, WALLS = new Set([11, 18, 26, 33]);
   const neighbors = (c) => {
     const r = Math.floor(c / COLS), k = c % COLS, out = [];
@@ -115,19 +127,31 @@
     if (k > 0) out.push(c - 1);
     return out.filter((x) => !WALLS.has(x));
   };
-  const gridPanel = (label, state, title) => ({
+  const gridPanel = (label, state, title, hero = 0) => ({
     type: 'cells', cols: COLS, title,
-    items: Array.from({ length: ROWS * COLS }, (_, c) => ({ id: c, v: c === 0 ? 'S' : c === GOAL ? 'G' : label(c) ?? '', s: WALLS.has(c) ? 'wall' : state(c) })),
+    items: Array.from({ length: ROWS * COLS }, (_, c) => ({ id: c, v: c === hero ? '🙂' : c === GOAL ? '🚪' : label(c) ?? '', s: WALLS.has(c) ? 'wall' : state(c) })),
   });
   CS.add({
     id: 'bfs-dfs', level: 'mid',
-    title: '그래프 탐색: DFS와 BFS는 다른 답을 낸다',
-    summary: '둘 다 "연결된 곳을 전부 방문"하지만 순서가 다릅니다. DFS는 한 길을 끝까지 파고, BFS는 가까운 곳부터 넓혀 갑니다. 최단 경로가 필요한데 DFS를 쓰면 "경로는 나오는데 돌아가는" 버그가 됩니다.',
-    headline: '찾은 경로 길이',
-    verdict: 'DFS는 처음 발견한 경로를, BFS는 가장 짧은 경로를 돌려줍니다. 간선 비용이 모두 같을 때 BFS가 처음 도착한 순간의 거리가 곧 최단 거리입니다.',
+    title: '그래프 탐색(DFS vs BFS): 미로에서 출구 찾기',
+    summary: '미로 게임에서 🙂가 🚪 출구까지 가야 합니다. 한 길을 끝까지 가 보는 탐험가(DFS)와, 출발점에서 사방으로 한 칸씩 번지는 물(BFS)은 같은 미로에서 다른 길을 찾습니다. 가장 짧은 길이 필요할 때 탐험가 방식을 쓰면 "길은 나오는데 돌아가는" 버그가 됩니다.',
+    headline: '출구까지 걸음 수',
+    verdict: '한 길만 파는 탐험가(DFS)는 출구에 닿긴 하지만 멀리 돌아갑니다. 사방으로 한 칸씩 번지는 물(BFS)은 출구에 처음 닿은 순간의 걸음 수가 곧 가장 짧은 길입니다. 한 칸 이동 비용이 모두 같을 때 성립합니다.',
+    story: {
+      scene: '미로 게임에서 길을 찾는 두 가지 성격입니다. 눈앞의 길을 끝까지 가 보는 탐험가와, 출발점에서 물을 부어 한 칸씩 번져 가게 하는 방법입니다.',
+      map: [
+        ['미로의 칸', '노드(정점)'],
+        ['옆 칸으로 한 걸음', '간선'],
+        ['이미 밟은 칸에 표시해 두기', '방문 표시 <code>visited</code> / <code>dist</code>'],
+        ['막다른 길에서 갈림길로 되돌아오기', '재귀 호출에서 돌아오기(스택)'],
+        ['물이 닿은 순서대로 다음 칸으로 번지기', '큐에서 먼저 넣은 것부터 꺼내기'],
+        ['칸에 적힌 숫자 (BFS)', '출발점으로부터의 최단 거리'],
+      ],
+      limit: '미로는 칸이 격자로 놓여 있지만 실제 그래프는 모양이 정해져 있지 않습니다(친구 관계, 서비스 호출, 의존성). 또 이 미로는 어느 칸으로 가든 한 걸음이지만, 길마다 걸리는 시간이 다르면 BFS는 더 이상 최단 경로를 보장하지 못하고 다익스트라가 필요합니다.',
+    },
     variants: [
       {
-        name: 'DFS (깊이 우선, 재귀)', tone: 'bad', label: '경로가 길다', big: { time: 'O(V + E)', space: 'O(깊이)' },
+        name: '한 길만 파는 탐험가 (DFS)', tone: 'bad', label: '멀리 돌아감', big: { time: 'O(V + E)', space: 'O(깊이)' },
         code: `function dfs(cell, path) {
   if (cell === goal) return path;
   visited.add(cell);
@@ -141,15 +165,15 @@
         notes: { 6: '갈 수 있으면 일단 끝까지' },
         run(t) {
           const visited = new Set(), order = {};
-          t.m['찾은 경로 길이'] = 0; t.m['방문한 칸'] = 0;
+          t.m['출구까지 걸음 수'] = 0; t.m['밟아 본 칸'] = 0;
           let path = [];
           const snap = (cur, final) => [gridPanel((c) => order[c], (c) => (final && path.includes(c) ? 'done' : c === cur ? 'active' : c === GOAL ? 'new' : visited.has(c) ? 'cmp' : ''),
-            'S에서 G까지 가는 길 찾기 — 숫자는 방문한 순서 (이웃 확인 순서: 아래 → 오른쪽 → 위 → 왼쪽)')];
+            '🙂에서 🚪까지 — 숫자는 밟은 순서 (갈 수 있으면 아래 → 오른쪽 → 위 → 왼쪽 순으로 먼저 감)', cur ?? 0)];
           const dfs = (cell, p) => {
             if (cell === GOAL) { path = p; return true; }
-            visited.add(cell); order[cell] = cell === 0 ? 'S' : ++t.m['방문한 칸'];
-            t.m['찾은 경로 길이'] = p.length - 1;
-            t.step(3, p.length === 1 ? `출발. DFS는 갈 수 있는 첫 번째 방향으로 <b>끝까지</b> 들어갑니다.` : `${p.length - 1}걸음째 — 막힐 때까지 계속 전진합니다. G가 바로 옆에 있었어도 모릅니다.`, snap(cell));
+            visited.add(cell); order[cell] = cell === 0 ? '출발' : ++t.m['밟아 본 칸'];
+            t.m['출구까지 걸음 수'] = p.length - 1;
+            t.step(3, p.length === 1 ? `출발! 탐험가는 갈 수 있는 첫 번째 방향으로 <b>끝까지</b> 들어갑니다.` : `${p.length - 1}걸음째 — 막힐 때까지 계속 전진합니다. 출구가 바로 옆 골목에 있어도 모릅니다.`, snap(cell));
             for (const next of neighbors(cell)) {
               if (visited.has(next)) continue;
               if (dfs(next, [...p, next])) return true;
@@ -157,12 +181,12 @@
             return false;
           };
           dfs(0, [0]);
-          t.m['찾은 경로 길이'] = path.length - 1;
-          t.step(2, `G 도착. 경로는 찾았지만 <b>${path.length - 1}걸음</b>이나 돌아왔습니다. DFS는 "처음 찾은 길"을 줄 뿐입니다.`, snap(GOAL, true));
+          t.m['출구까지 걸음 수'] = path.length - 1;
+          t.step(2, `출구 도착! 길은 찾았지만 <b>${path.length - 1}걸음</b>이나 걸었습니다. 이 탐험가는 "처음 찾은 길"을 알려 줄 뿐, 가장 짧은 길인지는 모릅니다.`, snap(GOAL, true));
         },
       },
       {
-        name: 'BFS (너비 우선, 큐)', tone: 'good', label: '최단 경로', big: { time: 'O(V + E)', space: 'O(너비)' },
+        name: '사방으로 번지는 물 (BFS)', tone: 'good', label: '가장 짧은 길', big: { time: 'O(V + E)', space: 'O(너비)' },
         code: `function bfs(start) {
   const queue = [start];
   dist.set(start, 0);
@@ -179,27 +203,27 @@
         notes: { 5: '먼저 발견한 칸부터', 9: '거리 = 부모 + 1' },
         run(t) {
           const dist = new Map([[0, 0]]), parent = {}, queue = [0], doneSet = new Set();
-          t.m['찾은 경로 길이'] = 0; t.m['방문한 칸'] = 0;
+          t.m['출구까지 걸음 수'] = 0; t.m['밟아 본 칸'] = 0;
           let path = [];
           const snap = (cur, final) => [
-            gridPanel((c) => dist.get(c), (c) => (final && path.includes(c) ? 'done' : c === cur ? 'active' : c === GOAL && !dist.has(c) ? 'new' : doneSet.has(c) ? 'cmp' : dist.has(c) ? 'new' : ''), 'S에서 G까지 — 숫자는 S로부터의 거리. 물결처럼 한 겹씩 퍼집니다'),
-            { type: 'cells', compact: true, title: '큐 (왼쪽부터 꺼냄) — 숫자는 그 칸의 거리', items: queue.map((c) => ({ id: c, v: dist.get(c), s: 'new' })) },
+            gridPanel((c) => dist.get(c), (c) => (final && path.includes(c) ? 'done' : c === cur ? 'active' : c === GOAL && !dist.has(c) ? 'new' : doneSet.has(c) ? 'cmp' : dist.has(c) ? 'new' : ''), '🙂에서 🚪까지 — 숫자는 출발점에서 몇 걸음인지. 물이 한 겹씩 번져 갑니다'),
+            { type: 'cells', compact: true, title: '다음에 번질 칸들 = 큐 (왼쪽부터 꺼냄) — 숫자는 그 칸까지의 걸음 수', items: queue.map((c) => ({ id: c, v: dist.get(c), s: 'new' })) },
           ];
-          t.step(3, `출발점을 큐에 넣습니다. 거리 0.`, snap(0));
+          t.step(3, `출발점에 물을 붓습니다. 출발 칸은 0걸음. 큐에 넣습니다.`, snap(0));
           while (queue.length) {
             const cell = queue.shift();
-            doneSet.add(cell); t.m['방문한 칸']++;
+            doneSet.add(cell); t.m['밟아 본 칸']++;
             if (cell === GOAL) {
               for (let c = GOAL; c !== undefined; c = parent[c]) path.unshift(c);
-              t.m['찾은 경로 길이'] = dist.get(cell);
-              t.step(6, `G를 큐에서 꺼냈습니다. 거리 <b>${dist.get(cell)}</b> — 이보다 짧은 길은 있을 수 없습니다. 더 가까운 칸을 전부 먼저 확인했기 때문입니다.`, snap(cell, true));
+              t.m['출구까지 걸음 수'] = dist.get(cell);
+              t.step(6, `물이 출구에 닿았습니다. <b>${dist.get(cell)}걸음</b> — 이보다 짧은 길은 있을 수 없습니다. 더 가까운 칸을 전부 먼저 적셨기 때문입니다.`, snap(cell, true));
               return;
             }
             const fresh = neighbors(cell).filter((x) => !dist.has(x));
             for (const next of fresh) { dist.set(next, dist.get(cell) + 1); parent[next] = cell; queue.push(next); }
             t.step(fresh.length ? 9 : 5, fresh.length
-              ? `거리 ${dist.get(cell)}인 칸을 꺼내, 처음 보는 이웃 ${fresh.length}칸에 거리 <b>${dist.get(cell) + 1}</b>을 적고 큐 뒤에 넣습니다.`
-              : `거리 ${dist.get(cell)}인 칸을 꺼냈지만 새 이웃이 없습니다.`, snap(cell));
+              ? `${dist.get(cell)}걸음 칸에서 물이 번집니다. 아직 마른 이웃 ${fresh.length}칸에 <b>${dist.get(cell) + 1}</b>을 적고 큐 뒤에 넣습니다.`
+              : `${dist.get(cell)}걸음 칸을 꺼냈지만 주변이 이미 다 젖어 있습니다.`, snap(cell));
           }
         },
       },
