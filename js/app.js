@@ -24,7 +24,21 @@
     play: ic('<path d="M7 5l12 7-12 7z" fill="currentColor"/>'),
     pause: ic('<path d="M8 5v14M16 5v14"/>'),
     replay: ic('<path d="M4 12a8 8 0 1 0 2.6-5.9M4 4v5h5"/>'),
-    target: ic('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/>'),
+    pulse: ic('<path d="M3 12h4l2.5-6 4 12 2.5-6h5"/>'),
+    cap: ic('<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11.5V16c0 1.2 2.7 2.5 6 2.5s6-1.3 6-2.5v-4.5M22 9v5"/>'),
+    chev: ic('<path d="m6 9 6 6 6-6"/>'),
+    gauge: ic('<path d="M4 16a8 8 0 1 1 16 0"/><path d="m12 16 4-5"/>'),
+    keyboard: ic('<rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6.5 10h.01M10 10h.01M14 10h.01M17.5 10h.01M7 14h10"/>'),
+    // 분야 아이콘
+    algo: ic('<circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M6 8.5v7M8.5 6H14a4 4 0 0 1 4 4v5.5"/>'),
+    ds: ic('<rect x="9" y="3" width="6" height="5" rx="1.2"/><rect x="3" y="16" width="6" height="5" rx="1.2"/><rect x="15" y="16" width="6" height="5" rx="1.2"/><path d="M12 8v4M6 16v-2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2"/>'),
+    lang: ic('<rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="m7 10 3 2.5L7 15M13 15h4"/>'),
+    net: ic('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>'),
+    db: ic('<ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/>'),
+    mem: ic('<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>'),
+    conc: ic('<path d="M4 7h14M15 4l3 3-3 3M20 17H6M9 14l-3 3 3 3"/>'),
+    dist: ic('<circle cx="12" cy="5" r="2.5"/><circle cx="5" cy="18" r="2.5"/><circle cx="19" cy="18" r="2.5"/><path d="M10.8 7.2 6.3 15.8M13.2 7.2l4.5 8.6M7.5 18h9"/>'),
+    ai: ic('<path d="M11 3l1.9 5.1L18 10l-5.1 1.9L11 17l-1.9-5.1L4 10l5.1-1.9z"/><path d="M18.5 15l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/>'),
   };
   for (const el of document.querySelectorAll('[data-ic]')) el.outerHTML = IC[el.dataset.ic];
   const EASE = 'cubic-bezier(.22,1,.36,1)';
@@ -240,36 +254,65 @@
 
   /* ---------- 레슨 로드 ---------- */
   const CHK = '<svg class="chk" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M5 8.3l2.1 2.1L11 6.2"/></svg>';
+  // 왼쪽 목차: 분야별 아코디언. 난이도 필터를 걸면 해당 단계만 남기고 전부 펼친다
+  let openCats = new Set(store.get('cs-cats', []));
   function buildNav() {
-    const byTopic = store.get('cs-nav') === 'topic';
-    for (const b of $('#navmode').children) b.classList.toggle('on', (b.dataset.m === 'topic') === byTopic);
+    const lv = store.get('cs-lv', '');
+    for (const b of $('#lvfilter').children) b.classList.toggle('on', b.dataset.l === lv);
     const lvName = (l) => LEVELS.find((x) => x[0] === l.level)[1];
-    const groups = byTopic
-      ? CS.topics.map(([key, name, desc]) => [key, `<span class="badge topic">${name}</span>`, desc, CS.lessons.filter((l) => CS.topicOf[l.id] === key)])
-      : LEVELS.map(([key, name, desc]) => [key, `<span class="badge ${key}">${name}</span>`, desc, CS.lessons.filter((l) => l.level === key)]);
-    $('#nav').innerHTML = groups.filter((g) => g[3].length).map(([key, badge, desc, items]) =>
-      `<div class="group"><h2>${badge}<small>${desc}</small><span class="cnt"></span></h2><div class="lvbar"><i></i></div>${items.map((l) =>
-        `<a href="#${l.id}" data-id="${l.id}">${CHK}<span>${esc(l.title)}</span>${byTopic ? `<i class="lv ${l.level}" title="${lvName(l)}"></i>` : ''}</a>`).join('')}</div>`).join('');
+    $('#nav').innerHTML = CS.topics.map(([key, name, desc]) => {
+      const items = CS.lessons.filter((l) => CS.topicOf[l.id] === key && (!lv || l.level === lv));
+      return items.length ? `<section class="cat" data-t="${key}">
+        <button type="button" class="cat-h"><span class="cat-ic">${IC[key]}</span><span class="cat-t"><b>${name}</b><small>${desc}</small></span><span class="cnt"></span>${IC.chev}</button>
+        <div class="lvbar"><i></i></div>
+        <div class="cat-b"><div>${items.map((l) => `<a href="#${l.id}" data-id="${l.id}">${CHK}<span>${esc(l.title)}</span><i class="lv ${l.level}" title="${lvName(l)}"></i></a>`).join('')}</div></div>
+      </section>` : '';
+    }).join('') || '<p class="none">이 단계의 레슨이 없습니다.</p>';
     markNav();
   }
   function markNav() {
+    const lv = store.get('cs-lv', '');
     for (const a of document.querySelectorAll('#nav a')) {
       a.classList.toggle('cur', !!state.lesson && a.dataset.id === state.lesson.id);
       a.classList.toggle('done', done.has(a.dataset.id));
     }
-    for (const g of document.querySelectorAll('#nav .group')) {
+    const cats = [...document.querySelectorAll('#nav .cat')];
+    for (const g of cats) {
       const all = g.querySelectorAll('a').length, n = g.querySelectorAll('a.done').length;
       $('.cnt', g).textContent = `${n}/${all}`;
       $('.lvbar i', g).style.width = `${(n / all) * 100}%`;
+      const open = !!lv || openCats.has(g.dataset.t);
+      g.classList.toggle('open', open);
+      g.classList.toggle('has-cur', !!$('a.cur', g));
+      $('.cat-h', g).setAttribute('aria-expanded', open);
     }
+    $('#expand').hidden = !!lv;
+    $('#expand').textContent = cats.every((g) => g.classList.contains('open')) ? '모두 접기' : '모두 펼치기';
     const total = CS.lessons.length, n = CS.lessons.filter((l) => done.has(l.id)).length;
     $('#prog b').textContent = `${n} / ${total}`;
     $('#prog .lvbar i').style.width = `${(n / total) * 100}%`;
     $('#symlink').classList.toggle('cur', state.page === 'symptoms');
     $('#preplink').classList.toggle('cur', state.page === 'prep');
-    const cur = $('#nav a.cur');
-    if (cur) cur.scrollIntoView({ block: 'nearest' });
   }
+  const saveCats = () => store.set('cs-cats', [...openCats]);
+  $('#nav').addEventListener('click', (e) => {
+    const h = e.target.closest('.cat-h');
+    if (!h || store.get('cs-lv', '')) return;
+    const t = h.parentNode.dataset.t;
+    if (openCats.has(t)) openCats.delete(t); else openCats.add(t);
+    saveCats(); markNav();
+  });
+  $('#expand').onclick = () => {
+    const all = CS.topics.map((t) => t[0]);
+    openCats = new Set(all.every((t) => openCats.has(t)) ? [] : all);
+    saveCats(); markNav();
+  };
+  $('#lvfilter').onclick = (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    store.set('cs-lv', b.dataset.l);
+    buildNav();
+  };
 
   const CATS = [['slow', '느려진다'], ['hang', '멈춘다 · 타임아웃'], ['memory', '메모리가 늘어난다'], ['wrong', '값이 틀리다'], ['flaky', '가끔만 발생한다'], ['data', '데이터 중복 · 유실'], ['crash', '에러로 죽는다']];
   const lessonLink = (id) => { const l = CS.lessons.find((x) => x.id === id); return l ? `<a class="chip" href="#${id}">${esc(l.title)}</a>` : ''; };
@@ -418,7 +461,7 @@
     const i = CS.lessons.indexOf(lesson);
     $('#level').textContent = lv[1];
     $('#level').className = 'badge ' + lesson.level;
-    $('#pos').textContent = `${i + 1} / ${CS.lessons.length}`;
+    $('#pos').textContent = `${topicName(lesson.id)} · ${i + 1} / ${CS.lessons.length}`;
     $('#title').textContent = $('#title').title = lesson.title;
     document.title = `${lesson.title} — CS 보이는 코드`;
 
@@ -444,7 +487,10 @@
     $('#pager').innerHTML = (prev ? `<a href="#${prev.id}">← ${esc(prev.title)}</a>` : '<span></span>') +
       (next ? `<a href="#${next.id}" class="next">다음: ${esc(next.title)} →</a>` : '<span></span>');
 
+    if (!openCats.has(CS.topicOf[lesson.id])) { openCats.add(CS.topicOf[lesson.id]); saveCats(); }
     markNav();
+    const curA = $('#nav a.cur');
+    if (curA) setTimeout(() => curA.scrollIntoView({ block: 'nearest' }), 320); // 아코디언이 펼쳐진 뒤에
     document.body.classList.remove('nav-open');
     build();
     scrollTo(0, 0);
@@ -524,6 +570,15 @@
     state.total = Math.max(...shown().map((r) => r.steps.length));
     state.idx = reset ? 0 : Math.min(state.idx, state.total - 1);
     $('#scrub').max = state.total - 1;
+    // 단계마다 읽는 데 필요한 시간(보통 속도 기준): 새로 나온 설명의 글자 수에 비례한다
+    state.delays = Array.from({ length: state.total }, (_, i) => {
+      let chars = 0;
+      for (const r of shown()) if (i < r.steps.length) chars += textLen(r.steps[i].msg);
+      return Math.min(10000, Math.max(900, 500 + chars * 48));
+    });
+    // 진행 막대 위에 "이 방식은 여기서 끝난다"를 점으로 표시
+    $('#marks').innerHTML = state.side ? state.runs.filter((r) => r.steps.length < state.total).map((r) =>
+      `<i class="${r.v.tone || 'info'}" style="--f:${(r.steps.length - 1) / (state.total - 1)}" title="${esc(r.v.name)} 완료 지점"></i>`).join('') : '';
     render();
     fitViz();
   }
@@ -665,9 +720,11 @@
 
     $('#scrub').value = idx;
     $('#scrub').style.setProperty('--p', `${(idx / Math.max(1, state.total - 1)) * 100}%`);
-    $('#count').textContent = `${idx + 1} / ${state.total}`;
+    $('#count').innerHTML = `<b>${idx + 1}</b> / ${state.total} 단계`;
+    const rest = state.delays.slice(idx, state.total - 1).reduce((a, b) => a + b, 0) / state.speed / 1000;
+    $('#eta').textContent = end ? '끝까지 봤습니다' : `자동 재생 시 약 ${rest < 55 ? `${Math.max(5, Math.round(rest / 5) * 5)}초` : `${Math.round(rest / 60)}분`} 남음`;
     const pb = state.playing ? 'pause' : end ? 'replay' : 'play';
-    if ($('#b-play').dataset.m !== pb) { $('#b-play').dataset.m = pb; $('#b-play').innerHTML = IC[pb] + { pause: '정지', replay: '처음부터', play: '자동 재생' }[pb]; }
+    if ($('#b-play').dataset.m !== pb) { $('#b-play').dataset.m = pb; $('#b-play').innerHTML = `${IC[pb]}<span>${{ pause: '일시정지', replay: '처음부터', play: '자동 재생' }[pb]}</span>`; }
     $('#b-prev').disabled = idx === 0;
     $('#b-next').disabled = end;
     if (end && !done.has(lesson.id)) {
@@ -686,13 +743,13 @@
     tbar.style.transition = `width ${ms}ms linear`;
     tbar.style.width = '100%';
   }
-  // 지금 화면에 새로 나온 설명의 글자 수만큼 기다린다. 글이 길면 오래, 짧으면 금방 넘어간다
-  function readTime() {
-    let chars = 0;
-    for (const r of shown()) if (state.idx < r.steps.length) chars += textLen(r.steps[state.idx].msg);
-    return Math.min(10000, Math.max(900, 500 + chars * 48)) / state.speed;
-  }
+  const readTime = () => state.delays[state.idx] / state.speed;
+  // 처음 온 사람에게 조작법을 한 번 알려 주고, 무엇이든 눌러 보면 사라진다
+  const coach = $('#coach');
+  coach.hidden = !!store.get('cs-coach');
+  const dismissCoach = () => { if (!coach.hidden) { coach.hidden = true; store.set('cs-coach', 1); } };
   function go(i) {
+    dismissCoach();
     state.idx = Math.max(0, Math.min(state.total - 1, i));
     render();
   }
@@ -706,6 +763,7 @@
     }, ms);
   }
   function play() {
+    dismissCoach();
     if (state.idx >= state.total - 1) state.idx = 0;
     state.playing = true;
     render();
@@ -724,7 +782,16 @@
   $('#b-next').onclick = () => { pause(); go(state.idx + 1); };
   $('#b-reset').onclick = () => { pause(); go(0); };
   $('#scrub').oninput = (e) => { const v = +e.target.value; pause(); go(v); };
-  $('#speed').onchange = (e) => { state.speed = +e.target.value; store.set('cs-speed', state.speed); if (state.playing) schedule(); };
+  const SPEEDS = [[0.5, '느리게'], [1, '보통'], [2, '빠르게'], [5, '훑기']];
+  function setSpeed(v, save = true) {
+    state.speed = v;
+    if (save) store.set('cs-speed', v);
+    for (const b of $('#speed').children) b.classList.toggle('on', +b.dataset.v === v);
+    $('#speed-cycle span').textContent = SPEEDS.find((x) => x[0] === v)[1];
+    if (state.playing) schedule(); else if (state.lesson && state.runs.length) render();
+  }
+  $('#speed').onclick = (e) => { const b = e.target.closest('button'); if (b) setSpeed(+b.dataset.v); };
+  $('#speed-cycle').onclick = () => setSpeed(SPEEDS[(SPEEDS.findIndex((x) => x[0] === state.speed) + 1) % SPEEDS.length][0]);
   $('#viewmode').onclick = (e) => {
     const b = e.target.closest('button');
     if (!b) return;
@@ -782,20 +849,16 @@
     else if (e.key === 'Home') { e.preventDefault(); pause(); go(0); }
     else if (e.key === 'End') { e.preventDefault(); pause(); go(state.total - 1); }
   });
-  $('#navmode').onclick = (e) => {
-    const b = e.target.closest('button');
-    if (!b) return;
-    store.set('cs-nav', b.dataset.m);
-    buildNav();
-  };
   addEventListener('hashchange', () => load(location.hash.slice(1)));
 
   if (store.get('cs-nav-off')) document.body.classList.add('nav-off');
   const sp = store.get('cs-speed');
-  if (sp && $(`#speed option[value="${sp}"]`)) { state.speed = sp; $('#speed').value = sp; }
+  setSpeed(SPEEDS.some((x) => x[0] === sp) ? sp : 1, false);
   const theme = store.get('cs-theme');
   if (theme) document.documentElement.dataset.theme = theme;
-  CS.lessons.sort((a, b) => LEVELS.findIndex((l) => l[0] === a.level) - LEVELS.findIndex((l) => l[0] === b.level));
+  // 레슨 순서 = 목차 순서: 분야 → 난이도. "다음 레슨"도 이 순서를 따른다
+  const rank = (l) => CS.topics.findIndex((t) => t[0] === CS.topicOf[l.id]) * 10 + LEVELS.findIndex((x) => x[0] === l.level);
+  CS.lessons.sort((a, b) => rank(a) - rank(b));
   buildNav();
   load(location.hash.slice(1));
 })();
