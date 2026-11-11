@@ -30,6 +30,8 @@
   };
   CS.topicOf = {};
   for (const [k, ids] of Object.entries(groups)) for (const id of ids.split(' ')) CS.topicOf[id] = k;
+  // 레슨 파일 안에 topic을 직접 적은 레슨 (새 레슨은 이 방식을 쓴다)
+  for (const l of CS.lessons) if (l.topic) CS.topicOf[l.id] = l.topic;
 
   CS.sizes = [
     ['n ≤ 10', 'O(n!)', '모든 순열 시도'],
@@ -271,4 +273,10 @@
       ['캐시를 갱신(set)하지 않고 삭제(delete)하는 이유는 무엇인가요?', '두 갱신이 동시에 일어나면 DB에는 나중 값이 들어갔는데 캐시에는 먼저 값이 늦게 써지는 순서 역전이 생길 수 있습니다. 삭제는 순서가 바뀌어도 결과가 같고, 다음 조회가 DB의 최신 값을 읽어 채웁니다. 조회되지 않을 값을 미리 계산하는 낭비도 없습니다.'],
     ],
   };
+
+  // 레슨 파일 안에 적은 코딩 테스트 정보(ct)와 면접 질문(qa)을 합친다
+  for (const l of CS.lessons) {
+    if (l.ct) CS.ct[l.id] = l.ct;
+    if (l.qa) CS.qa[l.id] = l.qa;
+  }
 })();

@@ -317,4 +317,7 @@
       fix: '반례가 있으면 상태를 정의해 DP로 바꿉니다. 그리디를 유지하려면 왜 최적인지 증명이 있어야 합니다.',
     },
   });
+
+  // 레슨 파일 안에 적은 증상 정보(dx)를 합친다
+  for (const l of CS.lessons) if (l.dx) CS.diagnose[l.id] = l.dx;
 })();

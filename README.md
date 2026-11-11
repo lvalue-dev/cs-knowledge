@@ -117,20 +117,16 @@ CS.add({
     },
   }],
   points: ['핵심 정리'], senior: '시니어 관점',
+  // 아래는 레슨과 함께 적는 부가 정보
+  topic: 'algo',                               // 목차 분야: algo | ds | lang | net | db | mem | conc | dist | ai
+  qa: [['면접 질문', '답의 뼈대']],              // 면접 질문 은행에 들어간다
+  dx: { cat: ['slow'], concept: '의심할 개념', symptoms: ['디버깅 중 보게 되는 현상'],
+        check: '무엇을 재면 확신할 수 있는가', fix: '고치는 방향' },   // 증상 사전 (선택)
+  ct: { signal: '문제에서 보이는 신호', how: '접근', big: 'O(n)', trap: '자주 틀리는 곳' },  // 코테 유형표 (선택)
 });
 ```
 
 패널 종류: `cells`(배열/막대/격자), `stack`, `buckets`, `graph`(트리·참조 그래프), `timeline`.
 새 파일을 만들었다면 `index.html`에 `<script>`를 추가하세요.
 
-증상 사전에 연결하려면 `js/symptoms.js`의 `CS.diagnose`에 같은 id로 항목을 추가합니다. 분야(`groups`), 면접 질문(`CS.qa`), 코딩 테스트 유형(`CS.ct`)은 `js/prep.js`에 같은 id로 추가합니다. 훈련 문제는 `js/drill.js`의 `D.problems`에 추가합니다(형식은 파일 위 주석 참고).
-
-```js
-'my-lesson': {
-  cat: ['slow'],                 // slow | hang | memory | wrong | flaky | data | crash
-  concept: '의심할 개념',
-  symptoms: ['디버깅 중 보게 되는 현상'],
-  check: '무엇을 재면 확신할 수 있는가',
-  fix: '고치는 방향',
-},
-```
+`dx.cat`은 `slow | hang | memory | wrong | flaky | data | crash` 중에서 고릅니다. 초기 레슨들은 같은 정보를 `js/prep.js`(분야 · 면접 질문 · 코테 유형)와 `js/symptoms.js`(증상)에 레슨 id로 모아 두었고, 두 방식은 함께 동작합니다. 훈련 문제는 `js/drill.js`의 `D.problems`에 추가합니다(형식은 파일 위 주석 참고).
