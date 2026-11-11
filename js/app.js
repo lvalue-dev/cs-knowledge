@@ -25,6 +25,7 @@
     pause: ic('<path d="M8 5v14M16 5v14"/>'),
     replay: ic('<path d="M4 12a8 8 0 1 0 2.6-5.9M4 4v5h5"/>'),
     pulse: ic('<path d="M3 12h4l2.5-6 4 12 2.5-6h5"/>'),
+    target: ic('<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.5"/><path d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4"/>'),
     cap: ic('<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11.5V16c0 1.2 2.7 2.5 6 2.5s6-1.3 6-2.5v-4.5M22 9v5"/>'),
     chev: ic('<path d="m6 9 6 6 6-6"/>'),
     gauge: ic('<path d="M4 16a8 8 0 1 1 16 0"/><path d="m12 16 4-5"/>'),
@@ -293,6 +294,7 @@
     $('#prog .lvbar i').style.width = `${(n / total) * 100}%`;
     $('#symlink').classList.toggle('cur', state.page === 'symptoms');
     $('#preplink').classList.toggle('cur', state.page === 'prep');
+    $('#drilllink').classList.toggle('cur', state.page === 'drill');
   }
   const saveCats = () => store.set('cs-cats', [...openCats]);
   $('#nav').addEventListener('click', (e) => {
@@ -370,7 +372,7 @@
         <table><tr><th>입력 크기 n</th><th>통과 가능한 복잡도</th><th>떠올릴 방법</th></tr>${CS.sizes.map((r) => `<tr><td><code>${r[0]}</code></td><td><code>${r[1]}</code></td><td>${r[2]}</td></tr>`).join('')}</table>
         <p class="fineprint">1초에 단순 연산 약 1억 번을 기준으로 한 어림값입니다. 제한 시간과 언어에 따라 달라집니다.</p></div>
       <div class="box"><h3>코딩 테스트 ② 문제 문장의 신호로 유형 고르기</h3>
-        <div class="tri">${CS.lessons.filter((l) => CS.ct[l.id]).map((l) => { const c = CS.ct[l.id]; return `<div class="tri-row"><div><b>${c.signal}</b></div><div>${c.how} <code>${c.big}</code></div><div class="chips">${lessonLink(l.id)}</div></div>`; }).join('')}</div></div>
+        <div class="tri">${CS.lessons.filter((l) => CS.ct[l.id]).map((l) => { const c = CS.ct[l.id]; return `<div class="tri-row"><div><b>${c.signal}</b></div><div>${c.how} <code>${c.big}</code></div><div class="chips">${lessonLink(l.id)}</div></div>`; }).join('')}</div><a class="dr-cta" href="#drill">표를 봤다면 실전처럼 유형 맞히기 →</a></div>
       <div class="symbar"><input id="symq" type="search" placeholder="질문 검색 (예: 인덱스, TCP, 캐시, 토큰)" aria-label="질문 검색">
         <div class="chips" id="symcats"><button type="button" class="chip on" data-c="">전체</button>${CS.topics.map(([k, n]) => `<button type="button" class="chip" data-c="${k}">${n}</button>`).join('')}</div>
         <div class="qa-tools"><button type="button" id="qa-rand" class="ghost">${IC.replay}아직 못 푼 질문 하나 뽑기</button><label><input type="checkbox" id="qa-todo"> 못 푼 질문만</label><span id="qa-prog">${known.size} / ${total} 답할 수 있음</span></div></div>
@@ -446,9 +448,179 @@
     scrollTo(0, 0);
   }
 
+  /* ---------- 코테 실전 훈련: 문제를 읽고 복잡도 · 접근 · 자료구조를 고른 뒤 채점 ---------- */
+  let drillTimer = null;
+  const DLV = { easy: '쉬움', mid: '보통', hard: '어려움' };
+  const DQ = [['cx', '이 제한에서 통과할 수 있는 가장 느린 복잡도는?'], ['algo', '어떤 접근으로 풀까요?'], ['ds', '핵심이 되는 자료구조는?']];
+  const big = (x) => {
+    if (!isFinite(x) || x >= 1e20) return isFinite(x) ? `10<sup>${Math.round(Math.log10(x))}</sup>` : '사실상 무한';
+    for (const [u, name] of [[1e16, '경'], [1e12, '조'], [1e8, '억'], [1e4, '만']]) {
+      if (x >= u) { const v = x / u; return `${(v >= 100 ? Math.round(v) : +v.toPrecision(2)).toLocaleString()}${name}`; }
+    }
+    return Math.round(x).toLocaleString();
+  };
+  const mmss = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+
+  function loadDrill(sub) {
+    const D = CS.drill, P = D.problems;
+    clearInterval(drillTimer);
+    let rec = store.get('cs-drill', {});
+    const solved = () => P.filter((x) => rec[x.id] && (rec[x.id].first || rec[x.id].clear)).length;
+    const tips = sub === 'tips';
+    const view = openPage('drill', '훈련', '코테 실전 훈련', `${solved()} / ${P.length} 해결`,
+      tips ? '유형을 외우는 것보다 문제를 받았을 때 무엇부터 볼지 순서를 정해 두는 편이 효과가 큽니다. 시험장에서 그대로 따라 할 수 있는 순서와 점검표입니다.'
+        : '코드를 쓰기 전에 방향부터 잡는 연습입니다. 문제를 읽고 허용 복잡도 · 접근 · 자료구조를 고르면, 왜 그런지와 실전에서 생각하는 순서를 보여 줍니다.');
+    const top = `<div class="dr-top"><div class="seg dr-seg"><a href="#drill"${tips ? '' : ' class="on"'}>문제 풀기</a><a href="#drill/tips"${tips ? ' class="on"' : ''}>사고방식 · 팁</a></div>`;
+
+    if (tips) {
+      const [routine, ...rest] = D.tips;
+      view.innerHTML = `${top}</div>
+        <div class="box steps dr-routine"><h3>${routine.title}</h3><ol>${routine.items.map((x) => `<li><span>${x}</span></li>`).join('')}</ol></div>
+        <div class="box"><h3>1단계의 근거: 입력 크기 → 허용 복잡도</h3>
+          <table><tr><th>입력 크기 n</th><th>통과 가능한 복잡도</th><th>떠올릴 방법</th></tr>${CS.sizes.map((r) => `<tr><td><code>${r[0]}</code></td><td><code>${r[1]}</code></td><td>${r[2]}</td></tr>`).join('')}</table>
+          <p class="fineprint">1초에 단순 연산 약 1억 번을 기준으로 한 어림값입니다. <a class="go" href="#prep">문제 문장의 신호 → 유형 표 보기 →</a></p></div>
+        <div class="dr-tips">${rest.map((t) => `<div class="box"><h3>${t.title}</h3><ul>${t.items.map((x) => `<li>${x}</li>`).join('')}</ul></div>`).join('')}</div>
+        <a class="dr-cta" href="#drill">순서를 익혔다면 문제로 연습하기 →</a>`;
+      markNav();
+      scrollTo(0, 0);
+      return;
+    }
+
+    const p = P.find((x) => x.id === sub) || P.find((x) => !rec[x.id]) || P[0];
+    const no = P.indexOf(p);
+    const status = (x) => { const r = rec[x.id]; return !r ? '' : r.first ? 'ok' : r.clear ? 're' : 'try'; };
+    const nameOf = (list, k) => list.find((x) => x[0] === k)[1];
+    const opts = (q) => (q === 'cx' ? D.cx : q === 'algo' ? D.algos : D.ds)
+      .map(([k, name, hint]) => `<button type="button" class="dr-opt" data-v="${k}" aria-pressed="false"><span>${name}</span>${hint ? `<small>${hint}</small>` : ''}</button>`).join('');
+
+    view.innerHTML = `${top}
+        <nav class="dr-board" aria-label="문제 목록">${P.map((x, i) => `<a class="dr-tile ${x.lv} ${status(x)}${x === p ? ' cur' : ''}" href="#drill/${x.id}" title="${esc(x.title)} · ${DLV[x.lv]}" aria-label="문제 ${i + 1}: ${esc(x.title)}">${i + 1}</a>`).join('')}</nav>
+        <button type="button" class="ghost" id="dr-rand">${IC.replay}안 푼 문제 무작위</button></div>
+      <div id="dr-stats"></div>
+      <div class="dr-main">
+        <article class="box dr-prob">
+          <header><span class="dr-no">문제 ${no + 1}</span><span class="badge dr-lv ${p.lv}">${DLV[p.lv]}</span><span class="dr-timer" id="dr-timer" title="유형 판단 목표: 3분">0:00</span></header>
+          <h2>${p.title}</h2>
+          <p class="dr-text">${p.text}</p>
+          <dl><dt>제한</dt><dd>${p.limits.map((x) => `<code>${x}</code>`).join(' ')}</dd><dt>예시</dt><dd>${p.ex}</dd></dl>
+          <button type="button" class="ghost" id="dr-hint">${IC.search}막히면: 눈여겨볼 표현 표시</button>
+        </article>
+        <section class="box dr-ans" aria-label="답 고르기">
+          ${DQ.map(([q, label], i) => `<div class="dr-q" data-q="${q}" role="group" aria-label="${label}"><h3><span class="qm">${i + 1}</span>${label}</h3><div class="dr-opts">${opts(q)}</div></div>`).join('')}
+          <div class="dr-submit"><button type="button" id="dr-grade" class="dr-go" disabled>채점하기</button><span id="dr-left">세 가지를 모두 고르면 채점할 수 있습니다</span></div>
+        </section>
+      </div>
+      <section id="dr-fb" hidden></section>`;
+
+    const drawStats = () => {
+      const tried = P.filter((x) => rec[x.id]);
+      $('#pos').textContent = `${solved()} / ${P.length} 해결`;
+      if (!tried.length) { $('#dr-stats').innerHTML = ''; return; }
+      const pct = (k) => Math.round(tried.filter((x) => rec[x.id][k]).length / tried.length * 100);
+      const weak = [...new Set(tried.filter((x) => !rec[x.id].algo || !rec[x.id].ds).map((x) => x.lesson))];
+      $('#dr-stats').innerHTML = `<div class="box dr-stats"><h3>첫 시도 기준 정답률 <small>${tried.length}문제 풀이</small></h3>
+        <div class="dr-meters">${[['cx', '복잡도 판단'], ['algo', '접근 고르기'], ['ds', '자료구조 고르기']].map(([k, n]) => `<div class="dr-meter"><span>${n}</span><b>${pct(k)}%</b><div class="lvbar"><i style="width:${pct(k)}%"></i></div></div>`).join('')}</div>
+        ${weak.length ? `<div class="dr-weak"><span>다시 볼 개념</span><div class="chips">${weak.map(lessonLink).join('')}</div></div>` : ''}
+        <button type="button" class="dr-reset" id="dr-reset">기록 지우기</button></div>`;
+      $('#dr-reset').onclick = () => { if (confirm('훈련 기록을 모두 지울까요?')) { store.set('cs-drill', {}); loadDrill(p.id); } };
+    };
+    drawStats();
+
+    const t0 = Date.now();
+    const tick = () => {
+      const s = Math.floor((Date.now() - t0) / 1000), el = $('#dr-timer');
+      if (!el) return clearInterval(drillTimer);
+      el.textContent = mmss(s);
+      el.classList.toggle('over', s >= 180);
+    };
+    drillTimer = setInterval(tick, 1000);
+
+    const pick = {};
+    $('.dr-ans').onclick = (e) => {
+      const b = e.target.closest('.dr-opt');
+      if (!b || $('.dr-ans').classList.contains('graded')) return;
+      const q = b.closest('.dr-q').dataset.q;
+      pick[q] = b.dataset.v;
+      for (const x of b.parentNode.children) { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', x === b); }
+      const left = 3 - Object.keys(pick).length;
+      $('#dr-grade').disabled = left > 0;
+      $('#dr-left').textContent = left ? `${left}가지가 남았습니다` : '준비됐습니다';
+    };
+    $('#dr-hint').onclick = () => { $('.dr-prob').classList.add('hint'); $('#dr-hint').hidden = true; };
+    $('#dr-rand').onclick = () => {
+      const pool = P.filter((x) => x !== p && !(rec[x.id] && (rec[x.id].first || rec[x.id].clear)));
+      const x = pool[Math.floor(Math.random() * pool.length)];
+      if (x) location.hash = `drill/${x.id}`;
+    };
+
+    $('#dr-grade').onclick = () => {
+      clearInterval(drillTimer);
+      const sec = Math.floor((Date.now() - t0) / 1000);
+      // 판정: 2 = 대표 풀이, 1 = 다른 풀이로 인정, 0 = 오답
+      const judge = (k, ans, ok) => (k === ans ? 2 : ok && ok[k] ? 1 : 0);
+      const res = { cx: pick.cx === p.cx ? 2 : 0, algo: judge(pick.algo, p.algo, p.algoOk), ds: judge(pick.ds, p.ds, p.dsOk) };
+      const score = Object.values(res).filter(Boolean).length;
+      const order = D.cx.map((x) => x[0]);
+      const why = {
+        cx: res.cx ? p.cxWhy : `${order.indexOf(pick.cx) < order.indexOf(p.cx) ? '그 복잡도로는 시간 초과입니다.' : '그렇게까지 빠를 필요는 없습니다. 필요 이상으로 어려운 풀이를 찾게 됩니다.'} ${p.cxWhy}`,
+        algo: res.algo === 2 ? '대표 풀이와 같습니다.' : res.algo ? `${p.algoOk[pick.algo]} 대표 풀이는 <b>${nameOf(D.algos, p.algo)}</b>입니다.` : `${(p.wrong || {})[pick.algo] || D.whenAlgo[pick.algo]} 대표 풀이는 <b>${nameOf(D.algos, p.algo)}</b>입니다.`,
+        ds: res.ds === 2 ? '대표 풀이와 같습니다.' : res.ds ? `${p.dsOk[pick.ds]} 대표 풀이는 <b>${nameOf(D.ds, p.ds)}</b>입니다.` : `${(p.wrongDs || {})[pick.ds] || D.whenDs[pick.ds]} 대표 풀이는 <b>${nameOf(D.ds, p.ds)}</b>입니다.`,
+      };
+      rec = store.get('cs-drill', {});
+      if (!rec[p.id]) rec[p.id] = { cx: +!!res.cx, algo: +!!res.algo, ds: +!!res.ds, sec, first: +(score === 3) };
+      else if (score === 3) rec[p.id].clear = 1;
+      store.set('cs-drill', rec);
+
+      $('.dr-ans').classList.add('graded');
+      $('.dr-prob').classList.add('hint');
+      $('#dr-hint').hidden = true;
+      $('.dr-submit').hidden = true;
+      const lists = { cx: D.cx, algo: D.algos, ds: D.ds };
+      for (const [q] of DQ) {
+        for (const b of $(`.dr-q[data-q="${q}"] .dr-opts`).children) {
+          b.disabled = true;
+          if (b.dataset.v === p[q]) b.classList.add('ans');
+          if (b.dataset.v === pick[q]) b.classList.add(res[q] === 2 ? 'ans' : res[q] ? 'alt' : 'no');
+        }
+      }
+      const n = p.n, lg = Math.log2(n);
+      const rows = [['log', 'O(log n)', lg], ['', 'O(n)', n], ['nlogn', 'O(n log n)', n * lg], ['quad', 'O(n²)', n * n], ['exp', 'O(2ⁿ)', n > 1000 ? Infinity : 2 ** n]];
+      const next = P.slice(no + 1).concat(P.slice(0, no)).find((x) => !rec[x.id]) || P[(no + 1) % P.length];
+      const lesson = CS.lessons.find((l) => l.id === p.lesson);
+      const MARK = ['✕', '△', '✓'], CLS = ['no', 'alt', 'ans'];
+      const fb = $('#dr-fb');
+      fb.hidden = false;
+      fb.innerHTML = `
+        <div class="box dr-result s${score}">
+          <header><b class="dr-score">${score}<small> / 3</small></b><div><strong>${['이번에는 세 가지 모두 놓쳤습니다. 아래 사고 과정을 따라가 보세요.', '한 가지를 맞혔습니다. 어디서 갈렸는지 확인하세요.', '두 가지를 맞혔습니다. 놓친 하나만 짚고 넘어가세요.', '세 가지 모두 맞혔습니다.'][score]}</strong>
+            <span>판단 시간 ${mmss(sec)} · 목표 3:00${sec > 180 ? ' (초과)' : ''}</span></div></header>
+          ${DQ.map(([q, label]) => `<div class="dr-row ${CLS[res[q]]}"><i>${MARK[res[q]]}</i><div><small>${label}</small><b>${nameOf(lists[q], pick[q])}</b><p>${why[q]}</p></div></div>`).join('')}
+        </div>
+        <div class="dr-cols">
+          <div class="box steps"><h3>이렇게 생각합니다</h3><ol>${p.think.map((x) => `<li><span>${x}</span></li>`).join('')}</ol></div>
+          <div class="box"><h3>이 입력 크기에서의 연산 횟수 <small>n = ${big(n)}</small></h3>
+            <table class="dr-ops">${rows.map(([k, name, v]) => `<tr class="${v <= 1e8 ? 'ans' : v <= 1e9 ? 'alt' : 'no'}${k === p.cx ? ' line' : ''}"><td><code>${name}</code></td><td>${big(v)}번</td><td>${v <= 1e8 ? '통과' : v <= 1e9 ? '아슬아슬' : '시간 초과'}</td></tr>`).join('')}</table>
+            <p class="fineprint">1초에 약 1억 번을 기준으로 한 어림입니다.</p></div>
+        </div>
+        <div class="box"><h3>풀이 뼈대</h3><pre class="dr-code">${esc(p.sk)}</pre></div>
+        <div class="box senior"><h3>자주 틀리는 곳</h3><p>${p.trap}</p></div>
+        <div class="dr-next"><button type="button" class="ghost" id="dr-again">${IC.replay}다시 풀기</button>${lesson ? `<a class="ghost" href="#${lesson.id}">애니메이션으로 복습: ${esc(lesson.title)}</a>` : ''}<a class="dr-go" href="#drill/${next.id}">다음 문제 ${IC.next}</a></div>`;
+      $('#dr-again').onclick = () => loadDrill(p.id);
+      const tile = $('.dr-tile.cur');
+      tile.classList.remove('ok', 're', 'try');
+      if (status(p)) tile.classList.add(status(p));
+      drawStats();
+      fb.scrollIntoView({ block: 'start', behavior: reduced ? 'auto' : 'smooth' });
+    };
+    markNav();
+    scrollTo(0, 0);
+  }
+
   function load(id) {
+    clearInterval(drillTimer);
     if (id === 'symptoms') return loadSymptoms();
     if (id === 'prep') return loadPrep();
+    if (id === 'drill' || id.startsWith('drill/')) return loadDrill(id.slice(6));
     state.page = null;
     const lesson = CS.lessons.find((l) => l.id === id) || CS.lessons[0];
     pause();
@@ -479,7 +651,7 @@
       ${lesson.story ? `<div class="box story"><h3>비유로 다시 보기</h3><p>${lesson.story.scene}</p>
         <table><tr><th>이야기 속에서는</th><th>실제 용어로는</th></tr>${lesson.story.map.map(([a, b]) => `<tr><td>${a}</td><td>${b}</td></tr>`).join('')}</table>
         <p class="fineprint"><b>비유가 맞지 않는 부분</b> — ${lesson.story.limit}</p></div>` : ''}
-      ${ct ? `<div class="box ct"><h3>코딩 테스트에서</h3><dl><dt>이런 문제면</dt><dd><b>${ct.signal}</b></dd><dt>접근</dt><dd>${ct.how} <code>${ct.big}</code></dd><dt>자주 틀리는 곳</dt><dd>${ct.trap}</dd></dl></div>` : ''}
+      ${ct ? `<div class="box ct"><h3>코딩 테스트에서</h3><dl><dt>이런 문제면</dt><dd><b>${ct.signal}</b></dd><dt>접근</dt><dd>${ct.how} <code>${ct.big}</code></dd><dt>자주 틀리는 곳</dt><dd>${ct.trap}</dd></dl>${CS.drill.problems.filter((x) => x.lesson === lesson.id).map((x) => `<a class="go" href="#drill/${x.id}">실전 문제로 연습: ${x.title} →</a>`).join('')}</div>` : ''}
       ${qa ? `<div class="box iv"><h3>면접 질문 — 답을 가린 채 먼저 말해 보세요</h3>${qaHTML(lesson.id)}<a class="go" href="#prep">질문 은행 전체 보기 →</a></div>` : ''}
       <div class="box"><h3>핵심 정리</h3><ul>${lesson.points.map((p) => `<li>${p}</li>`).join('')}</ul></div>
       <div class="box senior"><h3>시니어의 시선</h3><p>${lesson.senior}</p></div>
