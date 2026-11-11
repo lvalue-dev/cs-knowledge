@@ -26,6 +26,7 @@
     replay: ic('<path d="M4 12a8 8 0 1 0 2.6-5.9M4 4v5h5"/>'),
     pulse: ic('<path d="M3 12h4l2.5-6 4 12 2.5-6h5"/>'),
     target: ic('<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.5"/><path d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4"/>'),
+    paper: ic('<path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12h6M10 16h6"/>'),
     cap: ic('<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11.5V16c0 1.2 2.7 2.5 6 2.5s6-1.3 6-2.5v-4.5M22 9v5"/>'),
     chev: ic('<path d="m6 9 6 6 6-6"/>'),
     gauge: ic('<path d="M4 16a8 8 0 1 1 16 0"/><path d="m12 16 4-5"/>'),
@@ -295,6 +296,7 @@
     $('#symlink').classList.toggle('cur', state.page === 'symptoms');
     $('#preplink').classList.toggle('cur', state.page === 'prep');
     $('#drilllink').classList.toggle('cur', state.page === 'drill');
+    $('#paperlink').classList.toggle('cur', state.page === 'papers');
   }
   const saveCats = () => store.set('cs-cats', [...openCats]);
   $('#nav').addEventListener('click', (e) => {
@@ -616,8 +618,63 @@
     scrollTo(0, 0);
   }
 
+  /* ---------- 논문 · 연구: 분야별 고전과 최신 연구 요약 ---------- */
+  const NEW_FROM = 2023;
+  function loadPapers(focus) {
+    const all = [...CS.papers].sort((a, b) => b.year - a.year);
+    const fresh = all.filter((x) => x.year >= NEW_FROM).length;
+    const view = openPage('papers', '연구', '논문 · 연구', `${all.length}편 · 최신 ${fresh}편`,
+      '레슨에서 본 기법이 어디서 나왔는지, 그리고 지금 연구가 어디까지 왔는지를 정리했습니다. 논문마다 풀려던 문제, 핵심 아이디어, 개발자에게 주는 의미를 요약하고 원문과 관련 레슨을 연결했습니다.');
+    view.innerHTML = `
+      <div class="box steps pp-how"><h3>논문을 읽는 순서</h3><ol>
+        <li><span><b>제목 · 초록 · 결론만 먼저.</b> 무엇을 풀었고 무엇을 주장하는지 5분 안에 파악합니다. 여기서 관심이 없으면 그만 읽어도 됩니다.</span></li>
+        <li><span><b>그림과 실험 결과.</b> 무엇과 비교해 얼마나 나아졌는지, 어떤 조건에서 잰 것인지 봅니다. 불리한 조건이 빠져 있지 않은지도 확인합니다.</span></li>
+        <li><span><b>본문은 필요한 부분만.</b> 직접 구현하거나 판단 근거로 쓸 때에만 방법과 증명을 따라갑니다.</span></li></ol>
+        <p class="fineprint">아래 요약은 원문을 대신하지 않습니다. 이론적 결과가 바로 실무 성능으로 이어지지 않는 경우가 많으므로 "주의" 항목을 함께 보세요.${CS.papersChecked ? ` 서지 정보 확인 시점: ${CS.papersChecked}.` : ''}</p></div>
+      <div class="symbar"><input id="symq" type="search" placeholder="논문 검색 (예: 캐시, 최단 경로, 어텐션, 합의)" aria-label="논문 검색">
+        <div class="chips" id="symcats"><button type="button" class="chip on" data-c="">전체</button>${CS.topics.filter(([k]) => all.some((x) => x.topic === k)).map(([k, n]) => `<button type="button" class="chip" data-c="${k}">${n}</button>`).join('')}</div>
+        <div class="qa-tools"><div class="seg" id="pp-era"><button type="button" class="on" data-e="">전체</button><button type="button" data-e="new">최신 (${NEW_FROM}~)</button><button type="button" data-e="old">고전</button></div><span id="qa-prog"></span></div></div>
+      <div id="symlist"></div>`;
+    let cat = '', era = '';
+    const draw = () => {
+      const q = $('#symq').value.trim().toLowerCase();
+      const rows = all.filter((x) => (!cat || x.topic === cat) && (!era || (era === 'new') === (x.year >= NEW_FROM))
+        && (!q || [x.title, x.authors, x.venue, x.one, x.problem, x.idea, x.impact].join(' ').toLowerCase().includes(q)));
+      $('#qa-prog').textContent = `${rows.length}편`;
+      $('#symlist').innerHTML = rows.map((x) => `
+        <article class="sym-card pp" id="pp-${x.id}">
+          <header><div class="chips"><span class="tag">${CS.topics.find((t) => t[0] === x.topic)[1]}</span>${x.year >= NEW_FROM ? '<span class="tag fresh">최신</span>' : ''}</div><span class="pp-venue">${esc(x.venue)}</span></header>
+          <h3><a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.title)}<span aria-hidden="true"> ↗</span></a></h3>
+          <p class="pp-au">${esc(x.authors)} · ${x.year}</p>
+          <p class="pp-one">${x.one}</p>
+          <dl><dt>문제</dt><dd>${x.problem}</dd><dt>핵심 아이디어</dt><dd>${x.idea}</dd><dt>개발자에게</dt><dd>${x.impact}</dd>${x.caveat ? `<dt>주의</dt><dd>${x.caveat}</dd>` : ''}</dl>
+          ${x.lessons.some((id) => lessonLink(id)) ? `<div class="pp-rel"><span>관련 레슨</span><div class="chips">${x.lessons.map(lessonLink).join('')}</div></div>` : ''}
+        </article>`).join('') || '<p class="none">일치하는 논문이 없습니다.</p>';
+    };
+    $('#symq').oninput = draw;
+    $('#symcats').onclick = (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      cat = b.dataset.c;
+      for (const x of $('#symcats').children) x.classList.toggle('on', x === b);
+      draw();
+    };
+    $('#pp-era').onclick = (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      era = b.dataset.e;
+      for (const x of $('#pp-era').children) x.classList.toggle('on', x === b);
+      draw();
+    };
+    draw();
+    markNav();
+    const hit = focus && document.getElementById(`pp-${focus}`);
+    if (hit) { hit.classList.add('pick'); hit.scrollIntoView({ block: 'center' }); } else scrollTo(0, 0);
+  }
+
   function load(id) {
     clearInterval(drillTimer);
+    if (id === 'papers' || id.startsWith('papers/')) return loadPapers(id.slice(7));
     if (id === 'symptoms') return loadSymptoms();
     if (id === 'prep') return loadPrep();
     if (id === 'drill' || id.startsWith('drill/')) return loadDrill(id.slice(6));
@@ -645,6 +702,7 @@
     }
 
     const dg = CS.diagnose[lesson.id], ct = CS.ct[lesson.id], qa = CS.qa[lesson.id];
+    const related = CS.papers.filter((x) => x.lessons.includes(lesson.id));
     $('#learn').innerHTML = `
       ${dg ? `<div class="box dx"><h3>이런 현상을 봤다면 이 개념입니다</h3><ul class="sx">${dg.symptoms.map((x) => `<li>${x}</li>`).join('')}</ul>
         <dl><dt>확인 방법</dt><dd>${dg.check}</dd><dt>고치는 방향</dt><dd>${dg.fix}</dd></dl><a class="go" href="#symptoms">다른 증상 찾아보기 →</a></div>` : ''}
@@ -653,6 +711,7 @@
         <p class="fineprint"><b>비유가 맞지 않는 부분</b> — ${lesson.story.limit}</p></div>` : ''}
       ${ct ? `<div class="box ct"><h3>코딩 테스트에서</h3><dl><dt>이런 문제면</dt><dd><b>${ct.signal}</b></dd><dt>접근</dt><dd>${ct.how} <code>${ct.big}</code></dd><dt>자주 틀리는 곳</dt><dd>${ct.trap}</dd></dl>${CS.drill.problems.filter((x) => x.lesson === lesson.id).map((x) => `<a class="go" href="#drill/${x.id}">실전 문제로 연습: ${x.title} →</a>`).join('')}</div>` : ''}
       ${qa ? `<div class="box iv"><h3>면접 질문 — 답을 가린 채 먼저 말해 보세요</h3>${qaHTML(lesson.id)}<a class="go" href="#prep">질문 은행 전체 보기 →</a></div>` : ''}
+      ${related.length ? `<div class="box pp-box"><h3>더 깊이: 관련 논문</h3><ul>${related.map((x) => `<li><a href="#papers/${x.id}">${esc(x.title)}</a> <small>${esc(x.venue)}</small><br>${x.one}</li>`).join('')}</ul></div>` : ''}
       <div class="box"><h3>핵심 정리</h3><ul>${lesson.points.map((p) => `<li>${p}</li>`).join('')}</ul></div>
       <div class="box senior"><h3>시니어의 시선</h3><p>${lesson.senior}</p></div>
       ${lesson.variants.some((v) => v.big) ? `<div class="box"><h3>복잡도 비교</h3><table><tr><th>방식</th><th>시간</th><th>공간</th></tr>${lesson.variants.map((v) =>
@@ -1018,6 +1077,7 @@
     else if (e.key === 'Home') { e.preventDefault(); pause(); go(0); }
     else if (e.key === 'End') { e.preventDefault(); pause(); go(state.total - 1); }
   });
+  $('#paperlink').hidden = !CS.papers.length; // 논문 데이터가 비어 있으면 메뉴를 숨긴다
   addEventListener('hashchange', () => load(location.hash.slice(1)));
 
   if (store.get('cs-nav-off')) document.body.classList.add('nav-off');

@@ -71,13 +71,14 @@ svg.ic { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor
 .lvbar { height: 4px; border-radius: 2px; background: var(--panel3); overflow: hidden; }
 .lvbar i { display: block; height: 100%; width: 0; border-radius: 2px; background: var(--grad); transition: width .6s var(--ease); }
 
-.hub { position: relative; display: flex; gap: 11px; align-items: center; padding: 9px 11px; border-radius: 13px; border: 1px solid var(--line); background: color-mix(in srgb, var(--panel2) 70%, transparent); transition: transform .25s var(--ease), border-color .2s, box-shadow .25s, background .2s; }
-.hub + .hub { margin-top: 8px; }
+.hub[hidden] { display: none; }
+.hubs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.hub { position: relative; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; padding: 10px 11px; border-radius: 13px; border: 1px solid var(--line); background: color-mix(in srgb, var(--panel2) 70%, transparent); transition: transform .25s var(--ease), border-color .2s, box-shadow .25s, background .2s; }
 .hub:hover { transform: translateY(-1px); border-color: color-mix(in srgb, var(--c) 55%, var(--line)); box-shadow: 0 10px 26px -16px var(--c); }
 .hub.cur { border-color: var(--c); background: color-mix(in srgb, var(--c) 10%, var(--panel2)); }
 .hub > span:last-child { display: flex; flex-direction: column; min-width: 0; }
-.hub b { font-size: 13.5px; font-weight: 700; } .hub small { font-size: 11.5px; color: var(--muted); }
-#symlink { --c: var(--brand); } #preplink { --c: var(--new); } #drilllink { --c: var(--active); }
+.hub b { font-size: 13px; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; } .hub small { font-size: 11px; line-height: 1.35; color: var(--muted); }
+#symlink { --c: var(--brand); } #preplink { --c: var(--new); } #drilllink { --c: var(--active); } #paperlink { --c: var(--done); }
 /* 아이콘 타일: 허브와 분야가 같은 모양을 쓴다. 분야마다 색이 다르다 */
 .hub-ic, .cat-ic { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; color: var(--c); background: color-mix(in srgb, var(--c) 15%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 22%, transparent); transition: background .25s, color .25s, transform .3s var(--spring); }
 .hub-ic svg, .cat-ic svg { width: 17px; height: 17px; }
@@ -501,6 +502,23 @@ dd code, .sx code, .tri code { background: var(--panel3); padding: 1px 5px; bord
 #symview > .dr-cta { margin-top: 0; }
 .fineprint .go { margin-left: 8px; }
 .box.ct .go { display: block; margin-top: 10px; }
+
+/* ---------- 논문 · 연구 ---------- */
+.pp-how { --c: var(--done); }
+.pp { gap: 9px; scroll-margin-top: calc(var(--head-h) + 130px); }
+.pp h3 { font-size: 15.5px; font-weight: 750; line-height: 1.4; letter-spacing: -.01em; }
+.pp h3 a { transition: color .2s; } .pp h3 a:hover { color: var(--brand); text-decoration: underline; text-underline-offset: 3px; }
+.pp h3 span { color: var(--faint); font-weight: 500; }
+.pp-venue { flex: none; font: 600 11.5px var(--mono); color: var(--muted); white-space: nowrap; }
+.pp-au { font-size: 12.5px; color: var(--muted); }
+.pp-one { padding: 9px 12px; border-radius: 10px; background: var(--panel2); font-size: 14px; font-weight: 600; line-height: 1.55; }
+.pp.pick { border-color: var(--new); box-shadow: 0 0 0 4px color-mix(in srgb, var(--new) 18%, transparent), var(--shadow); }
+.tag.fresh { color: var(--done); background: color-mix(in srgb, var(--done) 14%, transparent); }
+.pp-rel { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin-top: auto; padding-top: 4px; font-size: 12px; color: var(--muted); }
+#pp-era button { height: 24px; }
+.box.pp-box { --c: var(--done); grid-column: 1 / -1; }
+.pp-box li { margin: 8px 0; } .pp-box a { font-weight: 650; color: var(--brand); } .pp-box a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.pp-box small { margin-left: 4px; font: 11.5px var(--mono); color: var(--muted); }
 
 /* ---------- 플레이어 ---------- */
 #player { position: fixed; left: 284px; right: 0; bottom: 0; z-index: 7; height: var(--player-h); padding: 6px var(--gut) 12px; pointer-events: none; container-type: inline-size; }
