@@ -259,21 +259,21 @@
   // 왼쪽 목차: 분야별 아코디언. 난이도 필터를 걸면 해당 단계만 남기고 전부 펼친다
   let openCats = new Set(store.get('cs-cats', []));
   function buildNav() {
-    const lv = store.get('cs-lv', '');
+    const lv = store.get('cs-lv', ''), q = $('#navq').value.trim().toLowerCase();
     for (const b of $('#lvfilter').children) b.classList.toggle('on', b.dataset.l === lv);
     const lvName = (l) => LEVELS.find((x) => x[0] === l.level)[1];
     $('#nav').innerHTML = CS.topics.map(([key, name, desc]) => {
-      const items = CS.lessons.filter((l) => CS.topicOf[l.id] === key && (!lv || l.level === lv));
+      const items = CS.lessons.filter((l) => CS.topicOf[l.id] === key && (!lv || l.level === lv) && (!q || `${l.title} ${l.id} ${l.summary}`.toLowerCase().includes(q)));
       return items.length ? `<section class="cat" data-t="${key}">
         <button type="button" class="cat-h"><span class="cat-ic">${IC[key]}</span><span class="cat-t"><b>${name}</b><small>${desc}</small></span><span class="cnt"></span>${IC.chev}</button>
         <div class="lvbar"><i></i></div>
         <div class="cat-b"><div>${items.map((l) => `<a href="#${l.id}" data-id="${l.id}">${CHK}<span>${esc(l.title)}</span><i class="lv ${l.level}" title="${lvName(l)}"></i></a>`).join('')}</div></div>
       </section>` : '';
-    }).join('') || '<p class="none">이 단계의 레슨이 없습니다.</p>';
+    }).join('') || `<p class="none">${q ? '일치하는 레슨이 없습니다.' : '이 단계의 레슨이 없습니다.'}</p>`;
     markNav();
   }
   function markNav() {
-    const lv = store.get('cs-lv', '');
+    const lv = store.get('cs-lv', '') || $('#navq').value.trim(); // 걸러 보는 동안에는 모든 분야를 펼친다
     for (const a of document.querySelectorAll('#nav a')) {
       a.classList.toggle('cur', !!state.lesson && a.dataset.id === state.lesson.id);
       a.classList.toggle('done', done.has(a.dataset.id));
@@ -301,11 +301,12 @@
   const saveCats = () => store.set('cs-cats', [...openCats]);
   $('#nav').addEventListener('click', (e) => {
     const h = e.target.closest('.cat-h');
-    if (!h || store.get('cs-lv', '')) return;
+    if (!h || store.get('cs-lv', '') || $('#navq').value.trim()) return;
     const t = h.parentNode.dataset.t;
     if (openCats.has(t)) openCats.delete(t); else openCats.add(t);
     saveCats(); markNav();
   });
+  $('#navq').oninput = buildNav;
   $('#expand').onclick = () => {
     const all = CS.topics.map((t) => t[0]);
     openCats = new Set(all.every((t) => openCats.has(t)) ? [] : all);
@@ -323,10 +324,44 @@
 
   // 증상 사전: 디버깅 중 관찰한 현상 → 의심할 CS 개념 → 확인 방법 → 처방
   // 레슨이 아닌 페이지(증상 사전, 면접·코테 대비)의 공통 틀
+  /* 긴 목록은 한 쪽 분량만 그린다. 쪽 넘김 막대는 화면 아래에 붙어 있어서 목록이 끝없이 길어지지 않는다 */
+  function paged(per, empty) {
+    const list = $('#symlist'), bar = $('#lpager');
+    let rows = [], page = 0;
+    const show = (scroll) => {
+      const pages = Math.max(1, Math.ceil(rows.length / per));
+      page = Math.max(0, Math.min(page, pages - 1));
+      const from = page * per, to = Math.min(rows.length, from + per);
+      list.innerHTML = rows.slice(from, to).join('') || `<p class="none">${empty}</p>`;
+      bar.hidden = !rows.length;
+      // 쪽 번호는 처음 · 끝 · 현재 주변만 보여 준다
+      const nums = [...new Set([0, pages - 1, page - 1, page, page + 1].filter((i) => i >= 0 && i < pages))].sort((a, b) => a - b);
+      bar.innerHTML = `<button type="button" data-p="${page - 1}" ${page ? '' : 'disabled'} aria-label="이전 쪽">${IC.prev}<span>이전</span></button>
+        <div class="lp-nums">${nums.map((i, k) => `${k && i - nums[k - 1] > 1 ? '<i>…</i>' : ''}<button type="button" data-p="${i}"${i === page ? ' class="on" aria-current="page"' : ''}>${i + 1}</button>`).join('')}</div>
+        <span class="lp-info"><b>${rows.length ? from + 1 : 0}–${to}</b> / ${rows.length}</span>
+        <button type="button" data-p="${page + 1}" ${page < pages - 1 ? '' : 'disabled'} aria-label="다음 쪽"><span>다음</span>${IC.next}</button>`;
+      if (scroll) list.scrollIntoView({ block: 'start' });
+    };
+    bar.onclick = (e) => {
+      const b = e.target.closest('button[data-p]');
+      if (b && !b.disabled) { page = +b.dataset.p; show(true); }
+    };
+    const api = {
+      set(r) { rows = r; page = 0; show(false); },
+      step(d) { const pages = Math.ceil(rows.length / per); if (page + d >= 0 && page + d < pages) { page += d; show(true); } },
+      open(i) { if (i >= 0) { page = Math.floor(i / per); show(false); } },
+    };
+    state.pager = api;
+    return api;
+  }
+  const fold = (title, body, cls = '') => `<details class="box fold ${cls}"><summary><h3>${title}</h3><span class="fold-t"></span></summary><div class="fold-b">${body}</div></details>`;
+  const LISTBAR = '<div id="symlist"></div><nav id="lpager" class="lpager" aria-label="쪽 이동" hidden></nav>';
+
   function openPage(page, badge, title, count, summary) {
     pause();
     state.lesson = null;
     state.page = page;
+    state.pager = null;
     document.body.classList.add('sym');
     document.body.classList.remove('nav-open');
     $('#level').textContent = badge;
@@ -370,27 +405,26 @@
     const view = openPage('prep', '대비', '면접 · 코테 대비', `질문 ${total}개`,
       '코딩 테스트는 "문제에서 유형을 알아보는 눈"이, 면접은 "왜 그런지 자기 말로 설명하는 힘"이 필요합니다. 표로 유형을 고르고, 질문은 답을 가린 채 먼저 말해 본 뒤 펼쳐 보세요.');
     view.innerHTML = `
-      <div class="box"><h3>코딩 테스트 ① 입력 크기로 허용 복잡도 가늠하기</h3>
-        <table><tr><th>입력 크기 n</th><th>통과 가능한 복잡도</th><th>떠올릴 방법</th></tr>${CS.sizes.map((r) => `<tr><td><code>${r[0]}</code></td><td><code>${r[1]}</code></td><td>${r[2]}</td></tr>`).join('')}</table>
-        <p class="fineprint">1초에 단순 연산 약 1억 번을 기준으로 한 어림값입니다. 제한 시간과 언어에 따라 달라집니다.</p></div>
-      <div class="box"><h3>코딩 테스트 ② 문제 문장의 신호로 유형 고르기</h3>
-        <div class="tri">${CS.lessons.filter((l) => CS.ct[l.id]).map((l) => { const c = CS.ct[l.id]; return `<div class="tri-row"><div><b>${c.signal}</b></div><div>${c.how} <code>${c.big}</code></div><div class="chips">${lessonLink(l.id)}</div></div>`; }).join('')}</div><a class="dr-cta" href="#drill">표를 봤다면 실전처럼 유형 맞히기 →</a></div>
+      ${fold('코딩 테스트 ① 입력 크기로 허용 복잡도 가늠하기', `<table><tr><th>입력 크기 n</th><th>통과 가능한 복잡도</th><th>떠올릴 방법</th></tr>${CS.sizes.map((r) => `<tr><td><code>${r[0]}</code></td><td><code>${r[1]}</code></td><td>${r[2]}</td></tr>`).join('')}</table>
+        <p class="fineprint">1초에 단순 연산 약 1억 번을 기준으로 한 어림값입니다. 제한 시간과 언어에 따라 달라집니다.</p>`)}
+      ${fold('코딩 테스트 ② 문제 문장의 신호로 유형 고르기', `<div class="tri">${CS.lessons.filter((l) => CS.ct[l.id]).map((l) => { const c = CS.ct[l.id]; return `<div class="tri-row"><div><b>${c.signal}</b></div><div>${c.how} <code>${c.big}</code></div><div class="chips">${lessonLink(l.id)}</div></div>`; }).join('')}</div><a class="dr-cta" href="#drill">표를 봤다면 실전처럼 유형 맞히기 →</a>`)}
       <div class="symbar"><input id="symq" type="search" placeholder="질문 검색 (예: 인덱스, TCP, 캐시, 토큰)" aria-label="질문 검색">
         <div class="chips" id="symcats"><button type="button" class="chip on" data-c="">전체</button>${CS.topics.map(([k, n]) => `<button type="button" class="chip" data-c="${k}">${n}</button>`).join('')}</div>
         <div class="qa-tools"><button type="button" id="qa-rand" class="ghost">${IC.replay}아직 못 푼 질문 하나 뽑기</button><label><input type="checkbox" id="qa-todo"> 못 푼 질문만</label><span id="qa-prog">${known.size} / ${total} 답할 수 있음</span></div></div>
-      <div id="symlist"></div>`;
-    let cat = '';
+      ${LISTBAR}`;
+    const pg = paged(6, '일치하는 질문이 없습니다.');
+    let cat = '', cards = [];
     const draw = () => {
       const q = $('#symq').value.trim().toLowerCase(), todo = $('#qa-todo').checked;
-      const rows = CS.lessons.filter((l) => CS.qa[l.id] && (!cat || CS.topicOf[l.id] === cat)).map((l) => {
+      cards = CS.lessons.filter((l) => CS.qa[l.id] && (!cat || CS.topicOf[l.id] === cat)).map((l) => {
         const items = CS.qa[l.id].map((x, i) => [x, i]).filter(([x, i]) => (!q || (l.title + x[0] + x[1]).toLowerCase().includes(q)) && (!todo || !known.has(`${l.id}:${i}`)));
-        if (!items.length) return '';
+        if (!items.length) return null;
         const all = qaHTML(l.id).split('</details>').filter((h) => h.trim()).map((h) => h + '</details>');
-        return `<article class="sym-card"><header><div class="chips"><span class="tag">${topicName(l.id)}</span></div>${levelBadge(l)}</header>
+        return { keys: items.map(([, i]) => `${l.id}:${i}`), html: `<article class="sym-card"><header><div class="chips"><span class="tag">${topicName(l.id)}</span></div>${levelBadge(l)}</header>
           ${items.map(([, i]) => all[i]).join('')}
-          <a class="go" href="#${l.id}">애니메이션으로 복습: ${esc(l.title)} →</a></article>`;
-      }).join('');
-      $('#symlist').innerHTML = rows || '<p class="none">일치하는 질문이 없습니다.</p>';
+          <a class="go" href="#${l.id}">애니메이션으로 복습: ${esc(l.title)} →</a></article>` };
+      }).filter(Boolean);
+      pg.set(cards.map((c) => c.html));
     };
     $('#symq').oninput = draw;
     $('#qa-todo').onchange = draw;
@@ -402,8 +436,11 @@
       draw();
     };
     $('#qa-rand').onclick = () => {
-      const pool = [...document.querySelectorAll('#symlist .qa:not(.known)')];
-      const pick = pool[Math.floor(Math.random() * pool.length)];
+      const todo = cards.flatMap((c, ci) => c.keys.filter((k) => !known.has(k)).map((k) => [ci, k]));
+      const got = todo[Math.floor(Math.random() * todo.length)];
+      if (!got) return;
+      pg.open(got[0]);
+      const pick = document.querySelector(`#symlist .qa[data-k="${got[1]}"]`);
       if (!pick) return;
       for (const d of document.querySelectorAll('#symlist .qa.pick')) d.classList.remove('pick');
       pick.classList.add('pick');
@@ -418,24 +455,25 @@
     const view = openPage('symptoms', '진단', '증상으로 찾기', `${Object.keys(CS.diagnose).length}개 항목`,
       '디버깅하다 본 현상에서 출발합니다. 어떤 CS 개념의 문제인지, 무엇을 재 보면 확신할 수 있는지, 어느 방향으로 고쳐야 하는지를 정리했습니다.');
     view.innerHTML = `
-      <div class="box steps"><h3>원인을 좁히는 순서</h3><ol>${CS.method.map((m) => `<li><span><b>${m[0]}</b> ${m[1]}</span></li>`).join('')}</ol></div>
-      <div class="box"><h3>1차 분류: 관찰한 것으로 영역 좁히기</h3>
-        <div class="tri">${CS.triage.map((t) => `<div class="tri-row"><div><b>${t.see}</b></div><div>${t.suspect}</div><div class="chips">${t.lessons.map(lessonLink).join('')}</div></div>`).join('')}</div></div>
+      ${fold('원인을 좁히는 순서', `<ol>${CS.method.map((m) => `<li><span><b>${m[0]}</b> ${m[1]}</span></li>`).join('')}</ol>`, 'steps')}
+      ${fold('1차 분류: 관찰한 것으로 영역 좁히기', `<div class="tri">${CS.triage.map((t) => `<div class="tri-row"><div><b>${t.see}</b></div><div>${t.suspect}</div><div class="chips">${t.lessons.map(lessonLink).join('')}</div></div>`).join('')}</div>`)}
       <div class="symbar"><input id="symq" type="search" placeholder="현상을 검색해 보세요 (예: 타임아웃, 메모리, 중복, 느려)" aria-label="증상 검색">
         <div class="chips" id="symcats"><button type="button" class="chip on" data-c="">전체</button>${CATS.map(([k, n]) => `<button type="button" class="chip" data-c="${k}">${n}</button>`).join('')}</div></div>
-      <div id="symlist"></div>`;
+      ${LISTBAR}`;
+    const pg = paged(6, '일치하는 항목이 없습니다. 다른 단어로 검색해 보세요.');
     let cat = '';
     const draw = () => {
       const q = $('#symq').value.trim().toLowerCase();
       const rows = CS.lessons.filter((l) => CS.diagnose[l.id]).map((l) => [l, CS.diagnose[l.id]]).filter(([l, d]) =>
         (!cat || d.cat.includes(cat)) && (!q || [l.title, d.concept, d.check, d.fix, ...d.symptoms].join(' ').toLowerCase().includes(q)));
-      $('#symlist').innerHTML = rows.map(([l, d]) => `
+      pg.set(rows.map(([l, d]) => `
         <article class="sym-card">
           <header><div class="chips">${d.cat.map((c) => `<span class="tag">${CATS.find((x) => x[0] === c)[1]}</span>`).join('')}</div><span class="badge ${l.level}">${LEVELS.find((x) => x[0] === l.level)[1]}</span></header>
           <ul class="sx">${d.symptoms.map((x) => `<li>${x}</li>`).join('')}</ul>
-          <dl><dt>의심할 개념</dt><dd><b>${d.concept}</b></dd><dt>확인 방법</dt><dd>${d.check}</dd><dt>고치는 방향</dt><dd>${d.fix}</dd></dl>
+          <dl><dt>의심할 개념</dt><dd><b>${d.concept}</b></dd></dl>
+          <details class="more"><summary>확인 방법과 고치는 방향</summary><dl><dt>확인 방법</dt><dd>${d.check}</dd><dt>고치는 방향</dt><dd>${d.fix}</dd></dl></details>
           <a class="go" href="#${l.id}">애니메이션으로 보기: ${esc(l.title)} →</a>
-        </article>`).join('') || '<p class="none">일치하는 항목이 없습니다. 다른 단어로 검색해 보세요.</p>';
+        </article>`));
     };
     $('#symq').oninput = draw;
     $('#symcats').onclick = (e) => {
@@ -626,30 +664,31 @@
     const view = openPage('papers', '연구', '논문 · 연구', `${all.length}편 · 최신 ${fresh}편`,
       '레슨에서 본 기법이 어디서 나왔는지, 그리고 지금 연구가 어디까지 왔는지를 정리했습니다. 논문마다 풀려던 문제, 핵심 아이디어, 개발자에게 주는 의미를 요약하고 원문과 관련 레슨을 연결했습니다.');
     view.innerHTML = `
-      <div class="box steps pp-how"><h3>논문을 읽는 순서</h3><ol>
+      ${fold('논문을 읽는 순서 · 이 요약을 읽을 때 주의할 점', `<ol>
         <li><span><b>제목 · 초록 · 결론만 먼저.</b> 무엇을 풀었고 무엇을 주장하는지 5분 안에 파악합니다. 여기서 관심이 없으면 그만 읽어도 됩니다.</span></li>
         <li><span><b>그림과 실험 결과.</b> 무엇과 비교해 얼마나 나아졌는지, 어떤 조건에서 잰 것인지 봅니다. 불리한 조건이 빠져 있지 않은지도 확인합니다.</span></li>
         <li><span><b>본문은 필요한 부분만.</b> 직접 구현하거나 판단 근거로 쓸 때에만 방법과 증명을 따라갑니다.</span></li></ol>
-        <p class="fineprint">아래 요약은 원문을 대신하지 않습니다. 이론적 결과가 바로 실무 성능으로 이어지지 않는 경우가 많으므로 "주의" 항목을 함께 보세요.${CS.papersChecked ? ` 서지 정보 확인 시점: ${CS.papersChecked}.` : ''}</p></div>
+        <p class="fineprint">아래 요약은 원문을 대신하지 않습니다. 이론적 결과가 바로 실무 성능으로 이어지지 않는 경우가 많으므로 "주의" 항목을 함께 보세요.${CS.papersChecked ? ` 서지 정보 확인 시점: ${CS.papersChecked}.` : ''}</p>`, 'steps pp-how')}
       <div class="symbar"><input id="symq" type="search" placeholder="논문 검색 (예: 캐시, 최단 경로, 어텐션, 합의)" aria-label="논문 검색">
         <div class="chips" id="symcats"><button type="button" class="chip on" data-c="">전체</button>${CS.topics.filter(([k]) => all.some((x) => x.topic === k)).map(([k, n]) => `<button type="button" class="chip" data-c="${k}">${n}</button>`).join('')}</div>
         <div class="qa-tools"><div class="seg" id="pp-era"><button type="button" class="on" data-e="">전체</button><button type="button" data-e="new">최신 (${NEW_FROM}~)</button><button type="button" data-e="old">고전</button></div><span id="qa-prog"></span></div></div>
-      <div id="symlist"></div>`;
-    let cat = '', era = '';
+      ${LISTBAR}`;
+    const pg = paged(6, '일치하는 논문이 없습니다.');
+    let cat = '', era = '', shown = [];
     const draw = () => {
       const q = $('#symq').value.trim().toLowerCase();
-      const rows = all.filter((x) => (!cat || x.topic === cat) && (!era || (era === 'new') === (x.year >= NEW_FROM))
+      shown = all.filter((x) => (!cat || x.topic === cat) && (!era || (era === 'new') === (x.year >= NEW_FROM))
         && (!q || [x.title, x.authors, x.venue, x.one, x.problem, x.idea, x.impact].join(' ').toLowerCase().includes(q)));
-      $('#qa-prog').textContent = `${rows.length}편`;
-      $('#symlist').innerHTML = rows.map((x) => `
+      $('#qa-prog').textContent = `${shown.length}편`;
+      pg.set(shown.map((x) => `
         <article class="sym-card pp" id="pp-${x.id}">
           <header><div class="chips"><span class="tag">${CS.topics.find((t) => t[0] === x.topic)[1]}</span>${x.year >= NEW_FROM ? '<span class="tag fresh">최신</span>' : ''}</div><span class="pp-venue">${esc(x.venue)}</span></header>
           <h3><a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.title)}<span aria-hidden="true"> ↗</span></a></h3>
           <p class="pp-au">${esc(x.authors)} · ${x.year}</p>
           <p class="pp-one">${x.one}</p>
-          <dl><dt>문제</dt><dd>${x.problem}</dd><dt>핵심 아이디어</dt><dd>${x.idea}</dd><dt>개발자에게</dt><dd>${x.impact}</dd>${x.caveat ? `<dt>주의</dt><dd>${x.caveat}</dd>` : ''}</dl>
+          <details class="more"><summary>문제 · 핵심 아이디어 · 개발자에게 주는 의미</summary><dl><dt>문제</dt><dd>${x.problem}</dd><dt>핵심 아이디어</dt><dd>${x.idea}</dd><dt>개발자에게</dt><dd>${x.impact}</dd>${x.caveat ? `<dt>주의</dt><dd>${x.caveat}</dd>` : ''}</dl></details>
           ${x.lessons.some((id) => lessonLink(id)) ? `<div class="pp-rel"><span>관련 레슨</span><div class="chips">${x.lessons.map(lessonLink).join('')}</div></div>` : ''}
-        </article>`).join('') || '<p class="none">일치하는 논문이 없습니다.</p>';
+        </article>`));
     };
     $('#symq').oninput = draw;
     $('#symcats').onclick = (e) => {
@@ -668,8 +707,10 @@
     };
     draw();
     markNav();
+    // 레슨에서 넘어온 경우: 그 논문이 있는 쪽을 열고 펼쳐 보여 준다
+    pg.open(shown.findIndex((x) => x.id === focus));
     const hit = focus && document.getElementById(`pp-${focus}`);
-    if (hit) { hit.classList.add('pick'); hit.scrollIntoView({ block: 'center' }); } else scrollTo(0, 0);
+    if (hit) { hit.classList.add('pick'); $('.more', hit).open = true; hit.scrollIntoView({ block: 'center' }); } else scrollTo(0, 0);
   }
 
   function load(id) {
@@ -679,6 +720,7 @@
     if (id === 'prep') return loadPrep();
     if (id === 'drill' || id.startsWith('drill/')) return loadDrill(id.slice(6));
     state.page = null;
+    state.pager = null;
     const lesson = CS.lessons.find((l) => l.id === id) || CS.lessons[0];
     pause();
     document.body.classList.remove('sym');
@@ -1069,8 +1111,11 @@
   };
   addEventListener('keydown', (e) => {
     if (e.key === 'Escape') document.body.classList.remove('nav-open');
+    const typing = /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName) && e.target.type !== 'range';
+    if (e.key === '/' && !typing) { e.preventDefault(); ($('#symq') && state.page ? $('#symq') : $('#navq')).focus(); return; }
+    if (typing) return;
+    if (state.pager && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) { e.preventDefault(); state.pager.step(e.key === 'ArrowRight' ? 1 : -1); return; }
     if (!state.lesson) return;
-    if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName) && e.target.type !== 'range') return;
     if (e.key === ' ') { e.preventDefault(); toggle(); }
     else if (e.key === 'ArrowRight') { e.preventDefault(); pause(); go(state.idx + 1); }
     else if (e.key === 'ArrowLeft') { e.preventDefault(); pause(); go(state.idx - 1); }
